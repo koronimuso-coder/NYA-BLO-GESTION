@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server';
-import type { NextRequest } from 'next/request';
 
-export function middleware(request: NextRequest) {
-  // Pass-through for Firebase-only backend until session cookie logic is implemented
+export function middleware() {
+  // Firebase Auth is handled client-side via AuthGuard component
+  // Middleware just passes through — no server-side session cookie needed with Firebase SDK
   return NextResponse.next();
 }
 
 export const config = {
-  matcher: ['/((?!api|_next/static|_next/image|.*\\.png$).*)'],
+  matcher: ['/((?!api|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)'],
 };

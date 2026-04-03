@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { MessageSquareText, X, Send, Loader2, Sparkles } from "lucide-react";
+import { X, Send, Loader2, Sparkles } from "lucide-react";
 import { useFirestoreCollection } from "@/hooks/useFirestore";
 
 export function Assistant() {
@@ -42,7 +42,7 @@ export function Assistant() {
       } else {
         setMessages(prev => [...prev, { role: "ai", content: "Désolé, une erreur technique m'empêche de vous répondre. (Erreur API)" }]);
       }
-    } catch (error) {
+    } catch {
       setMessages(prev => [...prev, { role: "ai", content: "Erreur de connexion au serveur AI." }]);
     } finally {
       setIsLoading(false);
