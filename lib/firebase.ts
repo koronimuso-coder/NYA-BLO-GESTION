@@ -1,7 +1,7 @@
-import { initializeApp, getApp, getApps } from "firebase/app";
-import { getAuth } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
-import { getStorage } from "firebase/storage";
+import { initializeApp, getApp, getApps, FirebaseApp } from "firebase/app";
+import { getAuth, Auth } from "firebase/auth";
+import { getFirestore, Firestore } from "firebase/firestore";
+import { getStorage, FirebaseStorage } from "firebase/storage";
 import { getAnalytics, isSupported } from "firebase/analytics";
 
 const firebaseConfig = {
@@ -14,15 +14,33 @@ const firebaseConfig = {
   measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID
 };
 
-// Initialize Firebase
-const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
+// Guard Firebase initialization to prevent build crashes
+const isBrowser = typeof window !== "undefined";
 
-export const auth = getAuth(app);
-export const db = getFirestore(app);
-export const storage = getStorage(app);
+let app: FirebaseApp | undefined;
+try {
+    if (getApps().length === 0) {
+        if (process.env.NEXT_PUBLIC_FIREBASE_API_KEY) {
+            app = initializeApp(firebaseConfig);
+        }
+    } else {
+        app = getApp();
+    }
+} catch (e) {
+    if (!isBrowser) {
+        console.warn("⚠️ Firebase initialization skipped during build (server-side).");
+    } else {
+        console.error("❌ Firebase initialization failed:", e);
+    }
+}
+
+// Exported instances with safety checks
+export const auth = app ? getAuth(app) : ({} as Auth);
+export const db = app ? getFirestore(app) : ({} as Firestore);
+export const storage = app ? getStorage(app) : ({} as FirebaseStorage);
 
 export const initAnalytics = async () => {
-    if (typeof window !== "undefined" && await isSupported()) {
+    if (app && isBrowser && await isSupported()) {
         return getAnalytics(app);
     }
     return null;
