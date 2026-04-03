@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { MessageSquareText, X, Send, Loader2, Sparkles } from "lucide-react";
+import { useFirestoreCollection } from "@/hooks/useFirestore";
 
 export function Assistant() {
   const [isOpen, setIsOpen] = useState(false);
@@ -10,6 +11,10 @@ export function Assistant() {
     { role: "ai", content: "Bonjour ! Je suis Nommo, votre assistant exécutif. En quoi puis-je vous aider pour le pilotage de vos entreprises aujourd'hui ?" }
   ]);
   const [isLoading, setIsLoading] = useState(false);
+
+  const { data: sales } = useFirestoreCollection("sales");
+  const { data: leads } = useFirestoreCollection("leads");
+  const { data: companies } = useFirestoreCollection("companies");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -21,10 +26,14 @@ export function Assistant() {
     setIsLoading(true);
 
     try {
+      const dbStats = `L'utilisateur a ${sales?.length || 0} ventes, ${leads?.length || 0} prospects actifs sur ${companies?.length || 0} entreprises.
+      Ventes: ${JSON.stringify(sales || []).substring(0, 800)}
+      Leads: ${JSON.stringify(leads || []).substring(0, 500)}`;
+
       const res = await fetch("/api/ai", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: userMessage }),
+        body: JSON.stringify({ prompt: userMessage, contextData: dbStats }),
       });
 
       const data = await res.json();

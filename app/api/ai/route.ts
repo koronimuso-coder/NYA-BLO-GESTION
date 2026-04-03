@@ -6,7 +6,7 @@ import { NextResponse } from "next/server";
  */
 export async function POST(req: Request) {
   try {
-    const { prompt, userName } = await req.json();
+    const { prompt, userName, contextData } = await req.json();
 
     if (!prompt) {
       return NextResponse.json({ error: "Prompt manquant" }, { status: 400 });
@@ -16,6 +16,10 @@ export async function POST(req: Request) {
     if (!process.env.OPENROUTER_API_KEY) {
       return NextResponse.json({ error: "Clé IA non configurée" }, { status: 500 });
     }
+
+    const systemPromptBase = `Tu es Nommo, l'assistant IA exécutif pour NYA BLO SARL (Côte d'Ivoire). Tu assistes le directeur (${userName || "Utilisateur" }). Tu es concis, pragmatique et orienté Business.
+    VOICI LES DONNEES ACTUELLES DE L'ENTREPRISE (basées sur Firebase) :
+    ${contextData ? contextData : "Aucune donnée lue pour le moment."}`;
 
     const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
@@ -30,7 +34,7 @@ export async function POST(req: Request) {
         messages: [
           {
             role: "system",
-            content: `Tu es Nommo, l'assistant IA exécutif pour NYA BLO SARL (Côte d'Ivoire). Tu assistes le directeur (${userName || "Utilisateur" }) pour l'analyse des données de 4 entreprises : GALF (Formation BTP), Yoela Flowers (Fleuriste), Yoela Beauty (Institut), NYA BLO Digital (Agence Tech). Tu dois être concis, pragmatique et orienté Business. Tu as désormais une structure de données basée sur Firebase Firestore.`
+            content: systemPromptBase
           },
           {
             role: "user",
