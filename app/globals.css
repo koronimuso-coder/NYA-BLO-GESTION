@@ -1,0 +1,64 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+@import "tailwindcss";
+@layer base {
+  :root {
+    --background: 226 21% 7%; /* dogon.nuit #0F1117 */
+    --foreground: 210 40% 98%; /* dogon.text #F8FAFC */
+
+    --card: 231 23% 15%; /* dogon.card #1E2130 */
+    --card-foreground: 210 40% 98%;
+
+    --popover: 231 23% 15%;
+    --popover-foreground: 210 40% 98%;
+
+    --primary: 239 84% 67%; /* dogon.indigo #6366F1 */
+    --primary-foreground: 210 40% 98%;
+
+    --secondary: 226 28% 14%; /* dogon.sirius #1A1D2E */
+    --secondary-foreground: 210 40% 98%;
+
+    --muted: 226 28% 14%;
+    --muted-foreground: 215 20% 65%; /* dogon.muted */
+
+    --accent: 258 90% 66%; /* dogon.violet #8B5CF6 */
+    --accent-foreground: 210 40% 98%;
+
+    --destructive: 0 84% 60%; /* dogon.danger #EF4444 */
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 226 28% 20%;
+    --input: 226 28% 20%;
+    --ring: 239 84% 67%;
+
+    --radius: 0.5rem;
+  }
+}
+
+@layer base {
+  * {
+    border-color: hsl(var(--border));
+  }
+  body {
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+    /* Dogon subtle background pattern */
+    background-image: radial-gradient(circle at 50% 0%, rgba(99, 102, 241, 0.05) 0%, transparent 50%),
+                      radial-gradient(circle at 0% 50%, rgba(139, 92, 246, 0.03) 0%, transparent 50%);
+  }
+}
+
+/* Custom scrollbar for dogon theme */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #0F1117;
+}
+::-webkit-scrollbar-thumb {
+  background: #1A1D2E;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #6366F1;
+}
