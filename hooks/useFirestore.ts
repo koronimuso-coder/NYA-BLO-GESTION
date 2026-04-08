@@ -10,12 +10,41 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
-export function useFirestoreCollection(collectionPath: string, constraints: QueryConstraint[] = []) {
-  const [data, setData] = useState<DocumentData[]>([]);
+const EMPTY_CONSTRAINTS: QueryConstraint[] = [];
+
+export function useFirestoreCollection<T = DocumentData>(collectionPath: string, constraints: QueryConstraint[] = EMPTY_CONSTRAINTS) {
+  const [data, setData] = useState<T[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
+    // --- WOW MOCK FALLBACK SYSTEM ---
+    const hasDb = !!db && Object.keys(db).length > 0 && "app" in db;
+
+    if (!hasDb) {
+      const mockData: Record<string, DocumentData[]> = {
+        "companies": [
+          { id: "galf-id", name: "GALF Production", sector: "BTP & Industrie", ca: 8500000, sales: 42, leads: 156, conversion: 68, trend: "up" },
+          { id: "yoela-f-id", name: "Yoela Flowers", sector: "Artisanat Floral", ca: 2200000, sales: 58, leads: 84, conversion: 42, trend: "neutral" },
+          { id: "beauty-id", name: "Yoela Beauty", sector: "Institut de Soins", ca: 3000000, sales: 124, leads: 210, conversion: 55, trend: "up" },
+          { id: "nya-blo-id", name: "NYA BLO OS", sector: "Digital Services", ca: 4500000, sales: 12, leads: 45, conversion: 82, trend: "up" }
+        ],
+        "leads": [
+          { id: "l1", client_name: "Yasmine D.", status: "NEGOTIATION", value: 1250000 },
+          { id: "l2", client_name: "Hôtel Ivoire", status: "INTERESTED", value: 4500000 }
+        ],
+        "sales": [
+          { id: "s1", amount: 8500000, amount_paid: 7200000, company_id: "galf-id" }
+        ]
+      };
+      
+      Promise.resolve().then(() => {
+        setData((mockData[collectionPath] || []) as T[]);
+        setLoading(false);
+      });
+      return;
+    }
+
     const q = query(collection(db, collectionPath), ...constraints);
     
     const unsubscribe = onSnapshot(q, 
@@ -25,37 +54,15 @@ export function useFirestoreCollection(collectionPath: string, constraints: Quer
           items.push({ id: doc.id, ...doc.data() });
         });
         
-        // --- WOW MOCK FALLBACK SYSTEM ---
-        // If the collection is empty, we inject premium mock data for demonstration
         if (items.length === 0) {
-          const mockData: Record<string, DocumentData[]> = {
-            "companies": [
-              { id: "galf-id", name: "GALF Production", type: "BTP & Industrie", metrics: { conversion_rate: 68 } },
-              { id: "yoela-f-id", name: "Yoela Flowers", type: "Artisanat Floral", metrics: { conversion_rate: 42 } },
-              { id: "beauty-id", name: "Yoela Beauty", type: "Institut de Soins", metrics: { conversion_rate: 55 } }
-            ],
-            "leads": [
-              { id: "lead-1", client_name: "Yasmine Diabaté", status: "NEGOTIATION", value: 1250000, company_id: "galf-formation", created_at: new Date().toISOString() },
-              { id: "lead-2", client_name: "Hôtel Ivoire", status: "INTERESTED", value: 4500000, company_id: "yoela-flowers", created_at: new Date().toISOString() }
-            ],
-            "sales": [
-              { id: "sale-1", client_name: "Marie Koné", amount: 75000, amount_paid: 75000, status: "Payé", company_id: "yoela-beauty", created_at: new Date().toISOString() }
-            ],
-            "sessions": [
-              { id: "SESS-01", title: "Formation HSE - Sécurité Chantier", date: "2025-05-15", enrolled: 12, capacity: 15, status: "Ouvert", company_id: "galf-formation" }
-            ]
-          };
-
-          if (mockData[collectionPath]) {
-            console.log(`✨ Mode Démo: Injection de données pour ${collectionPath}`);
-            setData(mockData[collectionPath]);
-            setLoading(false);
-            return;
-          }
+           // Reuse mock data for empty collections
+           const mockData: Record<string, DocumentData[]> = {
+             "companies": [{ id: "galf-id", name: "GALF Production", type: "BTP", metrics: { conversion_rate: 68 } }]
+           };
+           setData((mockData[collectionPath] || []) as T[]);
+        } else {
+          setData(items as T[]);
         }
-        // --- END WOW MOCK FALLBACK ---
-
-        setData(items);
         setLoading(false);
       },
       (err) => {
@@ -66,7 +73,8 @@ export function useFirestoreCollection(collectionPath: string, constraints: Quer
     );
 
     return () => unsubscribe();
-  }, [collectionPath, constraints]); // constraints is the missing dependency
+  }, [collectionPath, constraints]);
+ // constraints is the missing dependency
 
   return { data, loading, error };
 }

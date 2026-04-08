@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, Suspense } from "react";
+import { useState, Suspense, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { Loader2, ArrowRight, Lock } from "lucide-react";
-import { motion } from "framer-motion";
+import gsap from "gsap";
+import { useGSAP } from "@gsap/react";
 
 // Inner component uses useSearchParams — must be inside Suspense
 function LoginForm() {
@@ -108,17 +109,24 @@ function LoginForm() {
 }
 
 export default function LoginPage() {
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useGSAP(() => {
+    gsap.fromTo(
+      ".login-content",
+      { opacity: 0, y: 20 },
+      { opacity: 1, y: 0, duration: 0.5, ease: "power2.out" }
+    );
+  }, { scope: containerRef });
+
   return (
-    <div className="min-h-screen bg-dogon-nuit flex flex-col justify-center py-12 sm:px-6 lg:px-8 relative overflow-hidden">
+    <div ref={containerRef} className="min-h-screen bg-dogon-nuit flex flex-col justify-center py-12 sm:px-6 lg:px-8 relative overflow-hidden">
       {/* Background Orbs */}
       <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] rounded-full bg-dogon-indigo/10 blur-[100px] pointer-events-none" />
       <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] rounded-full bg-dogon-violet/10 blur-[100px] pointer-events-none" />
 
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-        className="sm:mx-auto sm:w-full sm:max-w-md z-10"
+      <div
+        className="login-content sm:mx-auto sm:w-full sm:max-w-md z-10"
       >
         <div className="text-center">
           <div className="mx-auto h-16 w-16 bg-dogon-card border border-dogon-or/20 rounded-xl flex items-center justify-center mb-6 shadow-lg shadow-dogon-or/5">
@@ -137,7 +145,7 @@ export default function LoginPage() {
         }>
           <LoginForm />
         </Suspense>
-      </motion.div>
+      </div>
     </div>
   );
 }

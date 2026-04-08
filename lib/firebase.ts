@@ -34,7 +34,8 @@ try {
     }
 }
 
-// Exported instances with safety checks
+// Exported instances with safety checks to avoid crashing the app if keys are missing
+// Note: If app is missing, we export empty objects, but AuthProvider will handle it gracefully.
 export const auth = app ? getAuth(app) : ({} as Auth);
 export const db = app ? getFirestore(app) : ({} as Firestore);
 export const storage = app ? getStorage(app) : ({} as FirebaseStorage);

@@ -1,13 +1,27 @@
 "use client";
 
 import { useState } from "react";
-import { GraduationCap, FolderOpen, Users, Calendar, Plus, Loader2 } from "lucide-react";
+import { GraduationCap, FolderOpen, Users, Calendar, Plus, Loader2, Check } from "lucide-react";
 import { formatFCFA } from "@/lib/fcfa";
 import { useFirestoreCollection } from "@/hooks/useFirestore";
-import { where } from "firebase/firestore";
+import { where, addDoc, collection } from "firebase/firestore";
+import { db } from "@/lib/firebase";
+import { CosmoModal } from "@/components/ui/CosmoModal";
+import { useAuth } from "@/components/providers/AuthProvider";
 
 export default function GalfModulePage() {
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<"sessions" | "catalog" | "candidats">("sessions");
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // Form state
+  const [newSession, setNewSession] = useState({
+    title: "",
+    date: "",
+    capacity: 20,
+    training_id: ""
+  });
 
   // Real-time data from Firestore for GALF only
   const { data: trainings, loading: loadingCatalog } = useFirestoreCollection("trainings", [
@@ -26,8 +40,33 @@ export default function GalfModulePage() {
     );
   }
 
+  const handlePlanSession = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newSession.title || !newSession.date) return;
+    
+    setIsSubmitting(true);
+    try {
+      await addDoc(collection(db, "sessions"), {
+        ...newSession,
+        company_id: "galf-formation",
+        status: "Ouvert",
+        enrolled: 0,
+        capacity: Number(newSession.capacity),
+        created_at: new Date().toISOString(),
+        created_by: user?.uid || "system"
+      });
+      setIsModalOpen(false);
+      setNewSession({ title: "", date: "", capacity: 20, training_id: "" });
+    } catch (error) {
+      console.error("Error adding session:", error);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   return (
-    <div className="h-full flex flex-col space-y-6 animate-in fade-in duration-500 pb-12">
+    <>
+      <div className="h-full flex flex-col space-y-6 animate-in fade-in duration-500 pb-12">
       {/* En-tête Module */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 rounded-xl relative p-6 overflow-hidden border border-dogon-or/20">
         <div className="absolute inset-0 bg-gradient-to-r from-dogon-card to-dogon-card/50 z-0"></div>
@@ -63,13 +102,16 @@ export default function GalfModulePage() {
         <div className="space-y-4">
             <div className="flex justify-between items-center">
               <h2 className="text-lg font-medium text-white">Sessions en cours et planifiées ({sessions.length})</h2>
-              <button className="flex items-center gap-2 bg-dogon-or hover:bg-dogon-or/90 text-dogon-nuit px-3 py-2 text-sm font-bold rounded-md shadow transition-colors">
+              <button 
+                onClick={() => setIsModalOpen(true)}
+                className="flex items-center gap-2 bg-dogon-or hover:bg-dogon-or/90 text-dogon-nuit px-3 py-2 text-sm font-bold rounded-md shadow transition-colors"
+              >
                 <Plus className="h-4 w-4" /> Planifier session
               </button>
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {sessions.map((session: any) => (
+              {sessions.map((session: { id: string, status: string, title: string, date: string, enrolled: number, capacity: number }) => (
                 <div key={session.id} className="bg-dogon-card border border-dogon-sirius rounded-xl p-5 hover:border-dogon-or/40 transition-colors group">
                   <div className="flex justify-between items-start mb-4">
                     <span className="text-xs font-mono font-bold text-dogon-or bg-dogon-or/10 px-2 py-0.5 rounded">{session.id}</span>
@@ -118,7 +160,7 @@ export default function GalfModulePage() {
               </tr>
             </thead>
             <tbody>
-              {trainings.map((f: any, i) => (
+              {trainings.map((f: { name: string, category: string, price: number, active: boolean }, i) => (
                 <tr key={i} className="border-b border-dogon-sirius/50 hover:bg-dogon-sirius/20 transition-colors">
                   <td className="px-6 py-4 font-medium text-white">{f.name}</td>
                   <td className="px-6 py-4 text-dogon-muted">{f.category}</td>
@@ -135,5 +177,64 @@ export default function GalfModulePage() {
         </div>
       )}
     </div>
-  );
+
+    <CosmoModal 
+      isOpen={isModalOpen} 
+      onClose={() => setIsModalOpen(false)} 
+      title="Planifier une Session"
+    >
+      <form onSubmit={handlePlanSession} className="space-y-4">
+        <div>
+          <label className="block text-xs font-bold text-dogon-or uppercase tracking-wider mb-1">Titre de la session</label>
+          <input 
+            type="text" 
+            required
+            placeholder="ex: Sécurité Incendie Niv. 1"
+            className="w-full bg-dogon-nuit border border-dogon-sirius rounded-lg px-4 py-2 text-white focus:border-dogon-or outline-none transition-colors"
+            value={newSession.title}
+            onChange={e => setNewSession({...newSession, title: e.target.value})}
+          />
+        </div>
+        
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-xs font-bold text-dogon-or uppercase tracking-wider mb-1">Date de début</label>
+            <input 
+              type="date" 
+              required
+              className="w-full bg-dogon-nuit border border-dogon-sirius rounded-lg px-4 py-2 text-white focus:border-dogon-or outline-none transition-colors"
+              value={newSession.date}
+              onChange={e => setNewSession({...newSession, date: e.target.value})}
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-dogon-or uppercase tracking-wider mb-1">Capacité max</label>
+            <input 
+              type="number" 
+              required
+              className="w-full bg-dogon-nuit border border-dogon-sirius rounded-lg px-4 py-2 text-white focus:border-dogon-or outline-none transition-colors"
+              value={newSession.capacity}
+              onChange={e => setNewSession({...newSession, capacity: parseInt(e.target.value)})}
+            />
+          </div>
+        </div>
+
+        <div className="pt-4">
+          <button 
+            type="submit"
+            disabled={isSubmitting}
+            className="w-full bg-dogon-or text-dogon-nuit font-bold py-3 rounded-xl hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-2 group disabled:opacity-50"
+          >
+            {isSubmitting ? <Loader2 className="h-5 w-5 animate-spin" /> : (
+              <>
+                <Check className="h-5 w-5" />
+                CONFIRMER LA PLANIFICATION
+              </>
+            )}
+          </button>
+        </div>
+      </form>
+    </CosmoModal>
+  </>
+);
 }

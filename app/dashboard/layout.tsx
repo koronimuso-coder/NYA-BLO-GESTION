@@ -3,7 +3,7 @@
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Header } from "@/components/layout/Header";
 import AuthGuard from "@/components/auth/AuthGuard";
-import { Assistant } from "@/components/ai/Assistant";
+
 
 export default function DashboardLayout({
   children,
@@ -29,7 +29,7 @@ export default function DashboardLayout({
           </main>
         </div>
       </div>
-      <Assistant />
+
     </AuthGuard>
   );
 }

@@ -1,0 +1,93 @@
+﻿Γû▓ Next.js 16.2.2 (Turbopack)
+- Environments: .env.local
+
+node.exe : ΓÜá The 
+"middleware" file 
+convention is deprecated. 
+Please use "proxy" 
+instead. Learn more: https:
+//nextjs.org/docs/messages/
+middleware-to-proxy
+At line:1 char:1
++ & "C:\Program 
+Files\nodejs/node.exe" 
+"C:\Program 
+Files\nodejs/node_mo ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~
+    + CategoryInfo         
+     : NotSpecified: (ΓÜá  
+   The "middle...leware-   
+ to-proxy:String) [], R    
+emoteException
+    + FullyQualifiedErrorI 
+   d : NativeCommandError
+ 
+  Creating an optimized production build ...
+Turbopack build 
+encountered 1 warnings:
+./tailwind.config.ts:100:13
+Module not found: Can't 
+resolve 
+'tailwindcss-animate'
+  [90m 98 |[0m     },
+  [90m 99 |[0m   },
+[31m[1m>[0m [90m100 
+|[0m   plugins: [require(
+[32m"tailwindcss-animate"[
+0m)],
+  [90m    |[0m           
+  [31m[1m^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^[0m
+  [90m101 |[0m } 
+satisfies [33mConfig[0m;
+  [90m102 |[0m
+  [90m103 |[0m 
+[36mexport[0m 
+[36mdefault[0m config;
+
+
+
+https://nextjs.org/docs/mes
+sages/module-not-found
+
+
+
+> Build error occurred
+Error: Turbopack build 
+failed with 1 errors:
+./app/api/auth/[...nextauth
+]/route.ts:1:1
+Module not found: Can't 
+resolve '@/lib/auth'
+[31m[1m>[0m [90m1 
+|[0m [36mimport[0m { 
+handlers } [36mfrom[0m 
+[32m"@/lib/auth"[0m;
+  [90m  |[0m [31m[1m^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^[0m
+  [90m2 |[0m
+  [90m3 |[0m 
+[36mexport[0m 
+[36mconst[0m { 
+[33mGET[0m, 
+[33mPOST[0m } = handlers;
+  [90m4 |[0m
+
+Import map: aliased to 
+relative './lib/auth' 
+inside of [project]/
+
+
+https://nextjs.org/docs/mes
+sages/module-not-found
+
+
+    at <unknown> (./app/api
+/auth/[...nextauth]/route.t
+s:1:1)
+    at <unknown> (https://n
+extjs.org/docs/messages/mod
+ule-not-found)
