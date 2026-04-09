@@ -1,0 +1,93 @@
+@import "tailwindcss";
+
+@theme {
+  /* Dogon Earthy Palette */
+  --color-primary: #5C3D2E;      /* Deep Clay */
+  --color-primary-light: #8B5E3C; 
+  --color-secondary: #A66037;    /* Terracotta */
+  --color-accent: #D4AF37;       /* Dogon Gold */
+  --color-surface: #FFFFFF;
+  --color-background: #FAF3E0;   /* Banco / Sand */
+  --color-foreground: #2D1A12;   /* Bark Brown */
+  
+  --color-clay-50: #FDF8F5;
+  --color-clay-100: #F7EAE3;
+  --color-clay-500: #A66037;
+  --color-clay-900: #5C3D2E;
+  
+  --shadow-premium: 0 10px 30px -5px rgba(92, 61, 46, 0.15), 0 4px 10px -5px rgba(92, 61, 46, 0.1);
+  --shadow-dogon: 0 15px 35px -5px rgba(166, 96, 55, 0.2);
+}
+
+:root {
+  --background: #FAF3E0;
+  --foreground: #2D1A12;
+  --primary: #5C3D2E;
+  --secondary: #A66037;
+  --accent: #D4AF37;
+  --card: #FFFFFF;
+  --border: #E8DCC4;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #1A0F0A;
+    --foreground: #F7EAE3;
+    --card: #2D1A12;
+    --border: #5C3D2E;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  color: var(--foreground);
+  background: var(--background);
+  font-family: 'Outfit', sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+.dogon-pattern {
+  background-image: radial-gradient(var(--border) 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+
+.dogon-gradient {
+  background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+}
+
+.dogon-card {
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  box-shadow: var(--shadow-premium);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.dogon-card:hover {
+  transform: translateY(-5px);
+  box-shadow: var(--shadow-dogon);
+  border-color: var(--secondary);
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  background: var(--background);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--secondary);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--primary);
+}
+
+.font-dogon {
+  font-family: 'Outfit', 'Inter', sans-serif;
+  letter-spacing: -0.02em;
+}

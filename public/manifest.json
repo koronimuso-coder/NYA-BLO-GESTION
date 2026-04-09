@@ -1,0 +1,21 @@
+{
+  "name": "NYA BLO GESTION",
+  "short_name": "NB GEST",
+  "description": "Système de gestion commerciale NYA BLO SARL",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#064E3B",
+  "theme_color": "#064E3B",
+  "icons": [
+    {
+      "src": "/icons/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icons/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
