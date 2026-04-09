@@ -15,6 +15,18 @@ import { Button } from "@/components/ui/Button";
 import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
 
+import { collection, getDocs, query, orderBy } from "firebase/firestore";
+import { db } from "@/lib/firebase/config";
+import jsPDF from "jspdf";
+import "jspdf-autotable";
+import * as XLSX from "xlsx";
+import toast from "react-hot-toast";
+
+// Extend jsPDF with autotable type
+interface jsPDFWithAutoTable extends jsPDF {
+  autoTable: (options: any) => jsPDF;
+}
+
 export default function ExportsPage() {
   const [isGenerating, setIsGenerating] = useState(false);
   const container = useRef<HTMLDivElement>(null);
@@ -38,12 +50,81 @@ export default function ExportsPage() {
     }, "-=0.2");
   }, { scope: container });
 
-  const handleExport = (format: string) => {
+  const fetchEntries = async () => {
+    const q = query(collection(db, "daily_entries"), orderBy("createdAt", "desc"));
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+  };
+
+  const handleExportPDF = async () => {
     setIsGenerating(true);
-    setTimeout(() => {
+    try {
+      const data = await fetchEntries();
+      const doc = new jsPDF() as jsPDFWithAutoTable;
+      
+      doc.setFontSize(20);
+      doc.text("RAPPORT D'ACTIVITÉ NYA BLO", 14, 22);
+      doc.setFontSize(10);
+      doc.text(`Généré le: ${new Date().toLocaleString()}`, 14, 30);
+
+      const tableData = data.map((e: any) => [
+        new Date(e.createdAt).toLocaleDateString(),
+        e.clientName || "N/A",
+        e.companyId || "N/A",
+        `${Number(e.totalAmount).toLocaleString()} FCFA`,
+        `${Number(e.paidAmount).toLocaleString()} FCFA`
+      ]);
+
+      doc.autoTable({
+        startY: 40,
+        head: [['Date', 'Client', 'Filiale', 'Total', 'Versé']],
+        body: tableData,
+        theme: 'striped',
+        headStyles: { fillColor: [92, 61, 46] }
+      });
+
+      doc.save(`NYA_BLO_Rapport_${new Date().toISOString().split('T')[0]}.pdf`);
+      toast.success("Rapport PDF généré avec succès");
+    } catch (error) {
+      console.error(error);
+      toast.error("Erreur lors de la génération du PDF");
+    } finally {
       setIsGenerating(false);
-      // Logic for real export would go here
-    }, 2000);
+    }
+  };
+
+  const handleExportExcel = async () => {
+    setIsGenerating(true);
+    try {
+      const data = await fetchEntries();
+      const worksheet = XLSX.utils.json_to_sheet(data.map((e: any) => ({
+        ID: e.id,
+        Date: new Date(e.createdAt).toLocaleString(),
+        Client: e.clientName,
+        Entreprise: e.companyId,
+        Total: e.totalAmount,
+        Verse: e.paidAmount,
+        Reste: Number(e.totalAmount) - Number(e.paidAmount)
+      })));
+      
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Activités");
+      XLSX.writeFile(workbook, `NYA_BLO_Archives_${new Date().toISOString().split('T')[0]}.xlsx`);
+      toast.success("Archive Excel générée avec succès");
+    } catch (error) {
+      console.error(error);
+      toast.error("Erreur lors de la génération de l'Excel");
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const handleExport = (format: string) => {
+    if (format === "PDF") handleExportPDF();
+    else if (format === "XLSX") handleExportExcel();
+    else {
+        toast.error("Fonctionnalité en cours de déploiement");
+    }
   };
 
   return (

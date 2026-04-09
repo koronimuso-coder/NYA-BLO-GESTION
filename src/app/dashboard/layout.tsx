@@ -7,8 +7,9 @@ import { Sidebar } from "@/components/dashboard/Sidebar";
 import GSAPWrapper from "@/components/GSAPWrapper";
 import { Bell, Search, UserCircle, Menu } from "lucide-react";
 
-export default function DashboardLayout({
+import NommoAI from "@/components/dashboard/NommoAI";
 
+export default function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
@@ -79,10 +80,11 @@ export default function DashboardLayout({
           <GSAPWrapper>
             {children}
           </GSAPWrapper>
+          
+          <NommoAI />
         </main>
       </div>
     </div>
-
   );
 }
 

@@ -1,28 +1,52 @@
-"use client";
-
-import React, { useRef } from "react";
-import { Plus, Users, ShieldCheck, Mail, Phone, MoreVertical, Search, Sparkles } from "lucide-react";
+import React, { useRef, useState, useEffect } from "react";
+import { Plus, Users, ShieldCheck, Mail, Phone, MoreVertical, Search, Sparkles, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
+import { collection, onSnapshot, query, orderBy } from "firebase/firestore";
+import { db } from "@/lib/firebase/config";
 
-const collaborators = [
-  { id: "1", name: "Aminata Koné", role: "Gestionnaire Stock", email: "aminata@nyablo.com", status: "Active", entries: 142 },
-  { id: "2", name: "Fatou Touré", role: "Commerciale Senior", email: "fatou@nyablo.com", status: "En Congé", entries: 89 },
-  { id: "3", name: "Mariam Diallo", role: "Superviseur Digital", email: "mariam@nyablo.com", status: "Active", entries: 216 }
-];
+interface Collaborator {
+  id: string;
+  displayName: string;
+  role: string;
+  email: string;
+  active: boolean;
+  entriesCount?: number;
+}
 
 export default function UsersPage() {
   const container = useRef<HTMLDivElement>(null);
+  const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const q = query(collection(db, "users"), orderBy("displayName", "asc"));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Collaborator));
+      setCollaborators(docs);
+      setLoading(false);
+    });
+    return () => unsubscribe();
+  }, []);
 
   useGSAP(() => {
-    const tl = gsap.timeline({ defaults: { ease: "power3.out" } });
-    tl.from(".page-header", { y: -20, opacity: 0, duration: 0.8 });
-    tl.from(".user-row", { y: 20, opacity: 0, stagger: 0.1, duration: 0.6 });
-  }, { scope: container });
+    if (!loading) {
+      const tl = gsap.timeline({ defaults: { ease: "power3.out" } });
+      tl.from(".page-header", { y: -20, opacity: 0, duration: 0.8 });
+      tl.from(".user-row", { y: 20, opacity: 0, stagger: 0.1, duration: 0.6 });
+    }
+  }, { scope: container, dependencies: [loading] });
+
+  if (loading) return (
+    <div className="min-h-[60vh] flex flex-col items-center justify-center">
+       <Loader2 className="w-12 h-12 text-[#A66037] animate-spin mb-4" />
+       <p className="text-[#5C3D2E] font-bold">Appel des forces de vente...</p>
+    </div>
+  );
 
   return (
-    <div ref={container} className="space-y-8 pb-12 relative">
+    <div ref={container} className="space-y-8 pb-12 relative text-[#2D1A12]">
       <div className="absolute inset-0 dogon-pattern opacity-5 pointer-events-none" />
 
       <div className="page-header flex flex-col md:flex-row md:items-center justify-between gap-6 relative z-10">
@@ -55,7 +79,7 @@ export default function UsersPage() {
                    <th className="px-8 py-5">Collaboratrice</th>
                    <th className="px-8 py-5">Rôle & Rang</th>
                    <th className="px-8 py-5">Statut</th>
-                   <th className="px-8 py-5">Activités (30j)</th>
+                   <th className="px-8 py-5">Activités</th>
                    <th className="px-8 py-5"></th>
                 </tr>
              </thead>
@@ -65,11 +89,11 @@ export default function UsersPage() {
                      <td className="px-8 py-6">
                         <div className="flex items-center gap-4">
                            <div className="w-12 h-12 rounded-2xl bg-[#5C3D2E] flex items-center justify-center text-white font-bold relative overflow-hidden">
-                              {user.name.charAt(0)}
+                              {user.displayName?.charAt(0) || "U"}
                               <div className="absolute inset-0 dogon-pattern opacity-10" />
                            </div>
                            <div>
-                              <p className="font-bold text-[#5C3D2E]">{user.name}</p>
+                              <p className="font-bold text-[#5C3D2E]">{user.displayName || "Utilisateur"}</p>
                               <p className="text-xs text-[#B89E7E]">{user.email}</p>
                            </div>
                         </div>
@@ -77,24 +101,21 @@ export default function UsersPage() {
                      <td className="px-8 py-6">
                         <div className="flex items-center gap-2">
                            <ShieldCheck className="w-4 h-4 text-[#D4AF37]" />
-                           <span className="text-sm font-bold text-[#A66037]">{user.role}</span>
+                           <span className="text-sm font-bold text-[#A66037] uppercase tracking-tighter">{user.role?.replace('_', ' ')}</span>
                         </div>
                      </td>
                      <td className="px-8 py-6">
                         <span className={`px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest ${
-                           user.status === "Active" ? "bg-emerald-50 text-emerald-700" : "bg-orange-50 text-orange-700"
+                           user.active !== false ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"
                         }`}>
-                           {user.status}
+                           {user.active !== false ? "Active" : "Inactive"}
                         </span>
                      </td>
                      <td className="px-8 py-6">
                         <div className="flex flex-col gap-1">
                            <div className="flex items-center gap-2">
                               <Sparkles className="w-3 h-3 text-[#D4AF37]" />
-                              <span className="font-bold text-[#5C3D2E]">{user.entries}</span>
-                           </div>
-                           <div className="w-24 h-1 bg-[#FAF3E0] rounded-full overflow-hidden">
-                              <div className="h-full bg-[#A66037] rounded-full" style={{ width: `${(user.entries/300)*100}%` }} />
+                              <span className="font-bold text-[#5C3D2E]">{user.entriesCount || 0}</span>
                            </div>
                         </div>
                      </td>
@@ -103,10 +124,13 @@ export default function UsersPage() {
                            <MoreVertical className="w-5 h-5" />
                         </button>
                      </td>
-                  </tr>
+                   </tr>
                 ))}
              </tbody>
           </table>
+          {collaborators.length === 0 && !loading && (
+             <div className="py-20 text-center italic text-[#B89E7E]">Aucun utilisateur trouvé dans les archives.</div>
+          )}
         </div>
       </div>
     </div>
