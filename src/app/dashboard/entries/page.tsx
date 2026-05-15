@@ -8,7 +8,8 @@ import {
   LayoutGrid,
   TrendingUp,
   Plus,
-  Loader2
+  Loader2,
+  AlertCircle
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 
@@ -95,11 +96,12 @@ export default function EntriesPage() {
         </div>
       </div>
 
-      <div className="stats-bar grid grid-cols-1 md:grid-cols-3 gap-6 relative z-10">
+      <div className="stats-bar grid grid-cols-1 md:grid-cols-4 gap-6 relative z-10">
          {[
             { label: "Saisies Totales", value: entries.length.toString(), icon: LayoutGrid, color: "text-[#5C3D2E]" },
-            { label: "Dernière Saisie", value: entries[0] ? new Date(entries[0].date).toLocaleDateString() : "--", icon: TrendingUp, color: "text-[#A66037]" },
-            { label: "Connecté", value: "Temps Réel", icon: Target, color: "text-[#D4AF37]" },
+            { label: "Total Ventes", value: entries.reduce((acc, curr) => acc + Number(curr.totalAmount || 0), 0).toLocaleString() + " FCFA", icon: TrendingUp, color: "text-[#A66037]" },
+            { label: "Total Encaissé", value: entries.reduce((acc, curr) => acc + Number(curr.paidAmount || 0), 0).toLocaleString() + " FCFA", icon: Target, color: "text-[#D4AF37]" },
+            { label: "Total Reste", value: entries.reduce((acc, curr) => acc + Number(curr.resteAVerser || 0), 0).toLocaleString() + " FCFA", icon: AlertCircle, color: "text-red-500" },
          ].map((stat, i) => (
             <div key={i} className="bg-white p-5 rounded-3xl shadow-premium border border-[#E8DCC4] flex items-center gap-4">
                <div className="w-12 h-12 bg-[#FAF3E0] rounded-2xl flex items-center justify-center text-[#5C3D2E] border border-[#E8DCC4]">
@@ -107,7 +109,7 @@ export default function EntriesPage() {
                </div>
                <div>
                   <p className="text-[10px] font-bold text-[#B89E7E] uppercase tracking-widest">{stat.label}</p>
-                  <p className={`text-xl font-bold font-dogon ${stat.color}`}>{stat.value}</p>
+                  <p className={`text-lg font-bold font-dogon ${stat.color}`}>{stat.value}</p>
                </div>
             </div>
          ))}
