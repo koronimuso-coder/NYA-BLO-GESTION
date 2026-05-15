@@ -116,7 +116,7 @@ export default function LandingPage() {
       {/* Footer */}
       <footer className="relative z-10 border-t border-white/5 py-12 px-8">
          <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-8">
-            <p className="text-[#B89E7E] text-sm italic">© 2024 NYA BLO SARL. L'architecture du futur.</p>
+            <p className="text-[#B89E7E] text-sm italic">© {new Date().getFullYear()} NYA BLO SARL. L'architecture du futur.</p>
             <div className="flex gap-6">
                <span className="text-[10px] font-bold text-white/40 uppercase tracking-widest">Abidjan</span>
                <span className="text-[10px] font-bold text-white/40 uppercase tracking-widest">Bamako</span>

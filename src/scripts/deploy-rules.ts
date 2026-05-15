@@ -21,7 +21,7 @@ try {
 
     console.log("🔑 Authentification en cours...");
     const client = await auth.getClient();
-    const headers = await client.getRequestHeaders();
+    const headers = await client.getRequestHeaders() as unknown as Record<string, string>;
 
     console.log("📡 Envoi du nouveau Ruleset...");
     const rulesetResponse = await axios.post(

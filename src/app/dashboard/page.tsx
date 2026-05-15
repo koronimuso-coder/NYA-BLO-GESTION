@@ -10,9 +10,9 @@ import {
   Calendar,
   ArrowRight,
   User,
-  Loader2
+  Loader2,
+  Activity
 } from "lucide-react";
-
 
 import { 
   XAxis, 
@@ -21,11 +21,12 @@ import {
   Tooltip, 
   ResponsiveContainer, 
   AreaChart, 
-  Area
+  Area,
+  Legend
 } from "recharts";
 import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
-import { collection, query, limit, onSnapshot, orderBy } from "firebase/firestore";
+import { collection, query, onSnapshot, orderBy } from "firebase/firestore";
 import { db } from "@/lib/firebase/config";
 
 interface DashboardEntry {
@@ -33,8 +34,10 @@ interface DashboardEntry {
   clientName: string;
   totalAmount: number;
   paidAmount: number;
+  resteAVerser: number;
   companyId: string;
   createdAt: string;
+  date: string;
 }
 
 interface DashboardStats {
@@ -42,6 +45,7 @@ interface DashboardStats {
   paid: string;
   pending: string;
   conversion: string;
+  count: number;
 }
 
 export default function DashboardPage() {
@@ -49,40 +53,48 @@ export default function DashboardPage() {
 
   const container = useRef<HTMLDivElement>(null);
   const [entries, setEntries] = useState<DashboardEntry[]>([]);
+  const [recentEntries, setRecentEntries] = useState<DashboardEntry[]>([]);
   const [stats, setStats] = useState<DashboardStats>({
      total: "0",
      paid: "0",
      pending: "0",
-     conversion: "0%"
+     conversion: "0%",
+     count: 0
   });
 
-  console.log("Connecté en tant que :", profile?.displayName);
-
-
   useEffect(() => {
-    // Real-time listener for ALL entries for stats
     const qAll = query(collection(db, "daily_entries"), orderBy("createdAt", "desc"));
     const unsubscribe = onSnapshot(qAll, (snapshot) => {
-      const allDocs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as DashboardEntry[];
+      const allDocs = snapshot.docs.map(doc => {
+        const data = doc.data();
+        const total = Number(data.totalAmount || 0);
+        const paid = Number(data.paidAmount || 0);
+        return {
+          id: doc.id,
+          ...data,
+          totalAmount: total,
+          paidAmount: paid,
+          resteAVerser: data.resteAVerser != null ? Number(data.resteAVerser) : (total - paid),
+        } as DashboardEntry;
+      });
       
-      // Update stats based on ALL data
       let t = 0;
       let p = 0;
-      snapshot.docs.forEach(d => {
-        const data = d.data();
-        t += Number(data.totalAmount || 0);
-        p += Number(data.paidAmount || 0);
+      allDocs.forEach(d => {
+        t += d.totalAmount;
+        p += d.paidAmount;
       });
       
       setStats({
         total: t.toLocaleString(),
         paid: p.toLocaleString(),
         pending: (t - p).toLocaleString(),
-        conversion: t > 0 ? Math.round((p / t) * 100) + "%" : "0%"
+        conversion: t > 0 ? Math.round((p / t) * 100) + "%" : "0%",
+        count: allDocs.length
       });
 
-      // Update recent entries (last 5)
-      setEntries(allDocs.slice(0, 5));
+      setEntries(allDocs);
+      setRecentEntries(allDocs.slice(0, 5));
     }, (error) => {
       console.error("Dashboard Real-time Error:", error);
     });
@@ -106,13 +118,21 @@ export default function DashboardPage() {
     );
   }
 
+  // Prepare chart data from last 10 entries (reversed for chronological order)
+  const chartData = entries.slice(0, 10).reverse().map(e => ({
+    name: e.clientName?.substring(0, 12) || "Client",
+    total: e.totalAmount,
+    paid: e.paidAmount,
+    reste: e.totalAmount - e.paidAmount,
+  }));
+
   return (
     <div ref={container} className="space-y-8 pb-10">
 
       <div className="page-header flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-primary font-dogon uppercase tracking-tight">Tableau de Bord Réel</h1>
-          <p className="text-[#B89E7E] mt-1">Données issues de votre infrastructure Firebase.</p>
+          <h1 className="text-3xl font-bold text-primary font-dogon uppercase tracking-tight">Tableau de Bord</h1>
+          <p className="text-[#B89E7E] mt-1">Vue globale de vos activités commerciales en temps réel.</p>
         </div>
         <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-2xl shadow-premium border border-[#E8DCC4]">
            <Calendar className="w-4 h-4 text-secondary" />
@@ -120,26 +140,39 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <KpiCard title="Ventes (Réel)" value={stats.total} trend="Live" isPositive={true} icon={Target} subtitle="Données synchronisées" />
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+        <KpiCard title="Total Ventes" value={stats.total} trend="Live" isPositive={true} icon={Target} subtitle="Chiffre d'affaires global" />
         <KpiCard title="Encaissements" value={stats.paid} trend="Live" isPositive={true} icon={CreditCard} subtitle="Fonds perçus" />
-        <KpiCard title="En Attente" value={stats.pending} trend="Recouvrement" isPositive={false} icon={AlertCircle} subtitle="À percevoir" />
-        <KpiCard title="Activités" value={entries.length.toString()} trend="Sync" isPositive={true} icon={TrendingUp} subtitle="Dernières saisies" />
+        <KpiCard title="En Attente" value={stats.pending} trend="Recouvrement" isPositive={false} icon={AlertCircle} subtitle="Montant à percevoir" />
+        <KpiCard title="Taux Conversion" value={stats.conversion} trend={stats.conversion} isPositive={true} icon={TrendingUp} subtitle="Encaissé / Total" showFCFA={false} />
+        <KpiCard title="Opérations" value={stats.count.toString()} trend="Total" isPositive={true} icon={Activity} subtitle="Saisies enregistrées" showFCFA={false} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         <div className="chart-box bg-white p-8 rounded-[40px] shadow-premium border border-[#E8DCC4]">
            <h3 className="font-bold text-xl text-primary font-dogon mb-8">Flux de Trésorerie</h3>
            <div className="h-[350px] w-full">
+              {chartData.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
-                 <AreaChart data={entries.map(e => ({ name: e.clientName || "Client", total: e.totalAmount, paid: e.paidAmount }))}>
+                 <AreaChart data={chartData}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E8DCC460" />
-                    <XAxis dataKey="name" axisLine={false} tickLine={false} />
-                    <YAxis axisLine={false} tickLine={false} />
-                    <Tooltip />
-                    <Area type="monotone" dataKey="total" stroke="#5C3D2E" strokeWidth={3} fill="#5C3D2E10" />
+                    <XAxis dataKey="name" axisLine={false} tickLine={false} fontSize={11} />
+                    <YAxis axisLine={false} tickLine={false} fontSize={11} tickFormatter={(v) => v >= 1000 ? `${(v/1000).toFixed(0)}k` : v} />
+                    <Tooltip 
+                      formatter={(value: any) => Number(value).toLocaleString() + " FCFA"}
+                      contentStyle={{ borderRadius: '16px', border: '1px solid #E8DCC4', fontWeight: 'bold' }}
+                    />
+                    <Legend />
+                    <Area type="monotone" dataKey="total" name="Total" stroke="#5C3D2E" strokeWidth={3} fill="#5C3D2E15" />
+                    <Area type="monotone" dataKey="paid" name="Encaissé" stroke="#059669" strokeWidth={2} fill="#05966910" />
+                    <Area type="monotone" dataKey="reste" name="Reste" stroke="#DC2626" strokeWidth={2} fill="#DC262610" strokeDasharray="5 5" />
                  </AreaChart>
               </ResponsiveContainer>
+              ) : (
+                <div className="h-full flex items-center justify-center text-[#B89E7E] italic">
+                  Aucune donnée disponible pour le graphique.
+                </div>
+              )}
            </div>
         </div>
 
@@ -151,8 +184,8 @@ export default function DashboardPage() {
                </button>
             </div>
             <div className="space-y-6">
-               {entries.map((entry, i) => (
-                  <div key={i} className="flex gap-4">
+               {recentEntries.map((entry, i) => (
+                  <div key={entry.id} className="flex gap-4">
                      <div className="w-12 h-12 rounded-2xl bg-[#FAF3E0] flex items-center justify-center shrink-0 border border-[#E8DCC4]">
                         <User className="w-6 h-6 text-[#5C3D2E]" />
                      </div>
@@ -160,10 +193,15 @@ export default function DashboardPage() {
                         <p className="text-sm font-bold text-primary truncate">{entry.clientName || "Client inconnu"}</p>
                         <p className="text-xs text-[#B89E7E] truncate">{entry.companyId} • {Number(entry.totalAmount).toLocaleString()} FCFA</p>
                      </div>
-                     <span className="text-[10px] font-bold text-[#A66037]">{new Date(entry.createdAt).toLocaleDateString()}</span>
+                     <div className="text-right shrink-0">
+                        <p className="text-xs font-bold text-emerald-600">{Number(entry.paidAmount).toLocaleString()}</p>
+                        <span className="text-[10px] font-bold text-[#A66037]">
+                          {entry.createdAt ? new Date(entry.createdAt).toLocaleDateString() : entry.date ? new Date(entry.date).toLocaleDateString() : "--"}
+                        </span>
+                     </div>
                   </div>
                ))}
-               {entries.length === 0 && (
+               {recentEntries.length === 0 && (
                   <p className="text-center py-10 text-slate-400 italic">Aucune donnée trouvée dans Firebase.</p>
                )}
             </div>
@@ -180,9 +218,10 @@ interface KpiCardProps {
   isPositive: boolean;
   icon: React.ElementType;
   subtitle: string;
+  showFCFA?: boolean;
 }
 
-const KpiCard = ({ title, value, trend, isPositive, icon: Icon, subtitle }: KpiCardProps) => (
+const KpiCard = ({ title, value, trend, isPositive, icon: Icon, subtitle, showFCFA = true }: KpiCardProps) => (
 
   <div className="kpi-card bg-white p-6 rounded-[32px] shadow-premium border border-[#E8DCC4] relative overflow-hidden group">
     <div className="absolute top-0 right-0 w-24 h-24 bg-[#5C3D2E]/5 rounded-bl-[80px] -mr-6 -mt-6 group-hover:bg-[#5C3D2E]/10 transition-all duration-500" />
@@ -197,7 +236,7 @@ const KpiCard = ({ title, value, trend, isPositive, icon: Icon, subtitle }: KpiC
       </div>
       <div>
         <p className="text-[#B89E7E] text-[10px] font-bold uppercase tracking-widest mb-1">{title}</p>
-        <h3 className="text-2xl font-bold text-primary font-dogon mb-1">{value} FCFA</h3>
+        <h3 className="text-xl font-bold text-primary font-dogon mb-1">{value}{showFCFA ? " FCFA" : ""}</h3>
         <p className="text-[10px] text-[#A66037] font-medium">{subtitle}</p>
       </div>
     </div>

@@ -42,7 +42,18 @@ export default function EntriesPage() {
   useEffect(() => {
     const q = query(collection(db, "daily_entries"), orderBy("date", "desc"));
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Entry));
+      const docs = snapshot.docs.map(doc => {
+        const data = doc.data();
+        const total = Number(data.totalAmount || 0);
+        const paid = Number(data.paidAmount || 0);
+        return {
+          id: doc.id,
+          ...data,
+          totalAmount: total,
+          paidAmount: paid,
+          resteAVerser: data.resteAVerser != null ? Number(data.resteAVerser) : (total - paid),
+        } as Entry;
+      });
       setEntries(docs);
       setLoading(false);
     }, (error) => {
@@ -162,9 +173,9 @@ export default function EntriesPage() {
                        {entry.companyId}
                     </span>
                   </td>
-                  <td className="px-8 py-6 font-bold text-[#5C3D2E] text-sm">{Number(entry.totalAmount).toLocaleString()}</td>
-                  <td className="px-8 py-6 text-emerald-600 font-bold text-sm">{Number(entry.paidAmount).toLocaleString()}</td>
-                  <td className="px-8 py-6 text-red-500 font-bold text-sm">{(entry.resteAVerser || 0).toLocaleString()}</td>
+                  <td className="px-8 py-6 font-bold text-[#5C3D2E] text-sm whitespace-nowrap">{Number(entry.totalAmount).toLocaleString()} FCFA</td>
+                  <td className="px-8 py-6 text-emerald-600 font-bold text-sm whitespace-nowrap">{Number(entry.paidAmount).toLocaleString()} FCFA</td>
+                  <td className="px-8 py-6 text-red-500 font-bold text-sm whitespace-nowrap">{(entry.resteAVerser || 0).toLocaleString()} FCFA</td>
                   <td className="px-8 py-6">
                      <span className="px-3 py-1 bg-blue-50 text-blue-700 rounded-lg text-[10px] font-bold uppercase tracking-tight">
                         {entry.modePaiement || "Espèces"}
