@@ -131,12 +131,23 @@ export default function DashboardPage() {
 
       <div className="page-header flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-primary font-dogon uppercase tracking-tight">Tableau de Bord</h1>
+          <p className="text-sm text-[#A66037] font-bold uppercase tracking-[0.2em] mb-1">
+            {new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+          </p>
+          <h1 className="text-3xl font-bold text-primary font-dogon uppercase tracking-tight">
+            Bienvenue{profile?.displayName ? `, ${profile.displayName.split(' ')[0]}` : ''} 👋
+          </h1>
           <p className="text-[#B89E7E] mt-1">Vue globale de vos activités commerciales en temps réel.</p>
         </div>
-        <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-2xl shadow-premium border border-[#E8DCC4]">
-           <Calendar className="w-4 h-4 text-secondary" />
-           <span className="text-sm font-bold text-primary">Temps Réel</span>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 bg-white px-4 py-2.5 rounded-2xl shadow-premium border border-[#E8DCC4]">
+             <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
+             <span className="text-sm font-bold text-primary">Temps Réel</span>
+          </div>
+          <div className="flex items-center gap-2 bg-white px-4 py-2.5 rounded-2xl shadow-premium border border-[#E8DCC4]">
+             <Calendar className="w-4 h-4 text-secondary" />
+             <span className="text-sm font-bold text-primary">{stats.count} ops</span>
+          </div>
         </div>
       </div>
 
@@ -159,7 +170,7 @@ export default function DashboardPage() {
                     <XAxis dataKey="name" axisLine={false} tickLine={false} fontSize={11} />
                     <YAxis axisLine={false} tickLine={false} fontSize={11} tickFormatter={(v) => v >= 1000 ? `${(v/1000).toFixed(0)}k` : v} />
                     <Tooltip 
-                      formatter={(value: any) => Number(value).toLocaleString() + " FCFA"}
+                      formatter={(value: unknown) => Number(value).toLocaleString() + " FCFA"}
                       contentStyle={{ borderRadius: '16px', border: '1px solid #E8DCC4', fontWeight: 'bold' }}
                     />
                     <Legend />
@@ -184,7 +195,7 @@ export default function DashboardPage() {
                </button>
             </div>
             <div className="space-y-6">
-               {recentEntries.map((entry, i) => (
+               {recentEntries.map((entry) => (
                   <div key={entry.id} className="flex gap-4">
                      <div className="w-12 h-12 rounded-2xl bg-[#FAF3E0] flex items-center justify-center shrink-0 border border-[#E8DCC4]">
                         <User className="w-6 h-6 text-[#5C3D2E]" />

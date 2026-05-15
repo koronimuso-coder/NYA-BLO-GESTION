@@ -1,11 +1,11 @@
 "use client";
 
 import React, { useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { Sidebar } from "@/components/dashboard/Sidebar";
 import GSAPWrapper from "@/components/GSAPWrapper";
-import { Bell, Search, UserCircle, Menu } from "lucide-react";
+import { Bell, Search, UserCircle, Menu, X } from "lucide-react";
 
 import NommoAI from "@/components/dashboard/NommoAI";
 
@@ -16,6 +16,7 @@ export default function DashboardLayout({
 }) {
   const { user, profile, loading } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
 
   useEffect(() => {
@@ -23,6 +24,11 @@ export default function DashboardLayout({
       router.push("/login");
     }
   }, [user, profile, loading, router]);
+
+  // Close mobile menu on route change
+  useEffect(() => {
+    setIsMobileMenuOpen(false);
+  }, [pathname]);
 
   if (loading || !user) {
     return (
@@ -46,7 +52,7 @@ export default function DashboardLayout({
           onClick={() => setIsMobileMenuOpen(false)}
         >
           <div className="w-72 h-full" onClick={(e) => e.stopPropagation()}>
-             <Sidebar />
+             <Sidebar onNavigate={() => setIsMobileMenuOpen(false)} />
           </div>
         </div>
       )}
@@ -103,4 +109,3 @@ export default function DashboardLayout({
     </div>
   );
 }
-

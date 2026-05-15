@@ -91,3 +91,21 @@ body {
   font-family: 'Outfit', 'Inter', sans-serif;
   letter-spacing: -0.02em;
 }
+
+.shadow-gold {
+  box-shadow: 0 10px 25px -5px rgba(166, 96, 55, 0.3), 0 4px 10px -5px rgba(212, 175, 55, 0.2);
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #E8DCC4;
+  border-radius: 3px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #A66037;
+}

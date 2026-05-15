@@ -13,7 +13,8 @@ import {
   LayoutDashboard,
   Users,
   ShieldCheck,
-  ChevronRight
+  ChevronRight,
+  X
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { auth } from "@/lib/firebase/config";
@@ -26,12 +27,15 @@ const MENU_ITEMS = [
   { icon: History, label: "Saisies de Vente", href: "/dashboard/entries" },
   { icon: Building2, label: "Entreprises", href: "/dashboard/companies" },
   { icon: Users, label: "Forces de Vente", href: "/dashboard/users" },
-  { icon: FileText, label: "Archives & Experts", href: "/dashboard/exports" },
+  { icon: FileText, label: "Archives & Exports", href: "/dashboard/exports" },
   { icon: Settings, label: "Paramètres", href: "/dashboard/settings" },
 ];
 
+interface SidebarProps {
+  onNavigate?: () => void;
+}
 
-export function Sidebar() {
+export function Sidebar({ onNavigate }: SidebarProps) {
   const pathname = usePathname();
   const { profile } = useAuth();
   const container = React.useRef(null);
@@ -46,10 +50,14 @@ export function Sidebar() {
     });
   }, { scope: container });
 
+  const handleNavClick = () => {
+    if (onNavigate) onNavigate();
+  };
+
   return (
     <div ref={container} className="w-72 h-screen bg-[#2D1A12] text-[#F7EAE3] flex flex-col sticky top-0 border-r border-[#5C3D2E]/50">
-      <div className="p-8 pb-12">
-        <Link href="/dashboard" className="flex items-center gap-3 group">
+      <div className="p-8 pb-12 flex items-center justify-between">
+        <Link href="/dashboard" className="flex items-center gap-3 group" onClick={handleNavClick}>
           <div className="w-12 h-12 bg-[#D4AF37] rounded-2xl flex items-center justify-center shadow-[0_0_20px_rgba(212,175,55,0.3)] group-hover:rotate-12 transition-transform">
              <ShieldCheck className="w-7 h-7 text-[#2D1A12]" />
           </div>
@@ -58,6 +66,11 @@ export function Sidebar() {
             <p className="text-[10px] text-[#A66037] font-bold tracking-[0.3em] uppercase mt-1">Symmetry & Earth</p>
           </div>
         </Link>
+        {onNavigate && (
+          <button onClick={onNavigate} className="lg:hidden p-2 hover:bg-white/10 rounded-xl transition-colors">
+            <X className="w-5 h-5 text-[#B89E7E]" />
+          </button>
+        )}
       </div>
 
       <nav className="flex-1 px-4 space-y-2 overflow-y-auto custom-scrollbar">
@@ -67,6 +80,7 @@ export function Sidebar() {
             <Link
               key={item.href}
               href={item.href}
+              onClick={handleNavClick}
               className={`nav-item flex items-center justify-between px-5 py-4 rounded-2xl transition-all group ${
                 isActive 
                 ? "bg-[#D4AF37] text-[#2D1A12] shadow-dogon font-bold" 

@@ -23,6 +23,7 @@ export default function UsersPage() {
   const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
 
   useEffect(() => {
     const q = query(collection(db, "users"), orderBy("displayName", "asc"));
@@ -33,6 +34,12 @@ export default function UsersPage() {
     });
     return () => unsubscribe();
   }, []);
+
+  const filteredCollaborators = collaborators.filter(u => 
+    u.displayName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    u.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    u.role?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   useGSAP(() => {
     if (!loading) {
@@ -72,7 +79,12 @@ export default function UsersPage() {
         <div className="p-8 border-b border-[#E8DCC4] flex flex-col md:flex-row md:items-center justify-between gap-4 bg-[#FAF3E0]/30">
           <div className="relative group min-w-[320px]">
              <Search className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-[#B89E7E]" />
-             <input placeholder="Rechercher une force de vente..." className="w-full pl-14 pr-6 py-4 rounded-2xl bg-white border border-[#E8DCC4] focus:ring-2 focus:ring-[#D4AF37]/20 font-medium text-[#5C3D2E]" />
+             <input 
+               placeholder="Rechercher une force de vente..." 
+               value={searchTerm}
+               onChange={(e) => setSearchTerm(e.target.value)}
+               className="w-full pl-14 pr-6 py-4 rounded-2xl bg-white border border-[#E8DCC4] focus:ring-2 focus:ring-[#D4AF37]/20 font-medium text-[#5C3D2E]" 
+             />
           </div>
         </div>
 
@@ -88,7 +100,7 @@ export default function UsersPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-[#E8DCC4]/30">
-              {collaborators.map((user) => (
+              {filteredCollaborators.map((user) => (
                 <tr key={user.id} className="user-row hover:bg-[#FAF3E0]/20 transition-colors group">
                   <td className="px-8 py-6">
                     <div className="flex items-center gap-4">
@@ -130,11 +142,13 @@ export default function UsersPage() {
                   </td>
                 </tr>
               ))}
-              {collaborators.length === 0 && !loading && (
-                 <tr>
-                   <td colSpan={5} className="py-20 text-center italic text-[#B89E7E]">Aucun utilisateur trouvé dans les archives.</td>
-                 </tr>
-              )}
+               {filteredCollaborators.length === 0 && (
+                  <tr>
+                    <td colSpan={5} className="py-20 text-center italic text-[#B89E7E]">
+                      {searchTerm ? `Aucun résultat pour "${searchTerm}".` : "Aucun utilisateur trouvé dans les archives."}
+                    </td>
+                  </tr>
+               )}
             </tbody>
           </table>
         </div>

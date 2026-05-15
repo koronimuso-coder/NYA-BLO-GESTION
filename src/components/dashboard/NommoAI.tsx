@@ -166,7 +166,7 @@ export default function NommoAI() {
               type="text" 
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              onKeyPress={(e) => e.key === "Enter" && handleSend()}
+              onKeyDown={(e) => e.key === "Enter" && handleSend()}
               placeholder="Interroger l'esprit des données..."
               className="w-full pl-4 pr-12 py-4 rounded-2xl bg-[#FAF3E0]/50 border-none focus:ring-2 focus:ring-[#D4AF37]/30 text-sm font-medium placeholder-[#B89E7E]"
             />

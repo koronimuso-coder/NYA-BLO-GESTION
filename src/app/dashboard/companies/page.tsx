@@ -161,10 +161,10 @@ export default function CompaniesPage() {
                   </td>
                 </tr>
               ))}
-              {companies.length === 0 && !loading && (
+              {filteredCompanies.length === 0 && (
                  <tr>
                     <td colSpan={5} className="px-8 py-20 text-center text-[#B89E7E] italic uppercase tracking-widest text-xs">
-                       Aucune archive filiale disponible.
+                       {searchTerm ? `Aucun résultat pour "${searchTerm}".` : "Aucune archive filiale disponible."}
                     </td>
                  </tr>
               )}
