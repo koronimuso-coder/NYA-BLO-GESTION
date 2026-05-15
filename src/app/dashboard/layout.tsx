@@ -16,6 +16,7 @@ export default function DashboardLayout({
 }) {
   const { user, profile, loading } = useAuth();
   const router = useRouter();
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
 
   useEffect(() => {
     if (!loading && (!user || !profile)) {
@@ -38,11 +39,26 @@ export default function DashboardLayout({
         <Sidebar />
       </div>
 
+      {/* Mobile Drawer Overlay */}
+      {isMobileMenuOpen && (
+        <div 
+          className="lg:hidden fixed inset-0 z-[100] bg-black/50 backdrop-blur-sm"
+          onClick={() => setIsMobileMenuOpen(false)}
+        >
+          <div className="w-72 h-full" onClick={(e) => e.stopPropagation()}>
+             <Sidebar />
+          </div>
+        </div>
+      )}
+
       {/* Main Content */}
       <div className="flex-1 flex flex-col min-w-0">
         <header className="h-20 bg-white/80 backdrop-blur-md border-b border-[#E8DCC4] sticky top-0 z-30 px-6 flex items-center justify-between">
           <div className="flex items-center gap-4 lg:hidden">
-             <button className="p-2 hover:bg-[#FAF3E0] rounded-lg">
+             <button 
+               className="p-2 hover:bg-[#FAF3E0] rounded-lg transition-colors"
+               onClick={() => setIsMobileMenuOpen(true)}
+             >
                 <Menu className="w-6 h-6 text-[#5C3D2E]" />
              </button>
              <h1 className="font-bold font-dogon text-[#5C3D2E] tracking-tight">NYA BLO</h1>

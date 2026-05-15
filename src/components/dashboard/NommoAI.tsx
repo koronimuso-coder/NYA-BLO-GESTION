@@ -96,11 +96,13 @@ export default function NommoAI() {
   };
 
   return (
-    <div className="fixed bottom-8 right-8 z-[100] font-outfit">
+    <div className="fixed bottom-8 right-8 z-[40] font-outfit">
       {/* Chat Window */}
       <div 
         ref={chatRef}
-        className="absolute bottom-20 right-0 w-[400px] h-[600px] bg-white rounded-[32px] shadow-dogon border border-[#E8DCC4] overflow-hidden flex flex-col pointer-events-auto origin-bottom-right"
+        className={`absolute bottom-20 right-0 w-[400px] h-[600px] bg-white rounded-[32px] shadow-dogon border border-[#E8DCC4] overflow-hidden flex flex-col origin-bottom-right transition-all duration-300 ${
+          isOpen ? "pointer-events-auto" : "pointer-events-none"
+        }`}
         style={{ opacity: 0, scale: 0.8, transform: 'translateY(50px)' }}
       >
         {/* Header */}

@@ -1,10 +1,13 @@
+"use client";
+
 import React, { useRef, useState, useEffect } from "react";
-import { Plus, Users, ShieldCheck, Mail, Phone, MoreVertical, Search, Sparkles, Loader2 } from "lucide-react";
+import { Plus, ShieldCheck, MoreVertical, Search, Sparkles, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
 import { collection, onSnapshot, query, orderBy } from "firebase/firestore";
 import { db } from "@/lib/firebase/config";
+import UserModal from "@/components/dashboard/UserModal";
 
 interface Collaborator {
   id: string;
@@ -19,6 +22,7 @@ export default function UsersPage() {
   const container = useRef<HTMLDivElement>(null);
   const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   useEffect(() => {
     const q = query(collection(db, "users"), orderBy("displayName", "asc"));
@@ -52,9 +56,13 @@ export default function UsersPage() {
       <div className="page-header flex flex-col md:flex-row md:items-center justify-between gap-6 relative z-10">
         <div>
           <h1 className="text-3xl font-bold text-[#5C3D2E] font-dogon uppercase tracking-tight">Forces de Vente</h1>
-          <p className="text-[#B89E7E] mt-1">Gérez vos collaboratrices et leurs niveaux d'accès.</p>
+          <p className="text-[#B89E7E] mt-1">Gérez vos collaboratrices et leurs niveaux d&apos;accès.</p>
         </div>
-        <Button variant="gold" className="rounded-2xl shadow-gold h-14 min-w-[240px]">
+        <Button 
+          variant="gold" 
+          className="rounded-2xl shadow-gold h-14 min-w-[240px]"
+          onClick={() => setIsModalOpen(true)}
+        >
           <Plus className="w-5 h-5 mr-3" />
           Nouvelle Collaboratrice
         </Button>
@@ -66,73 +74,72 @@ export default function UsersPage() {
              <Search className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-[#B89E7E]" />
              <input placeholder="Rechercher une force de vente..." className="w-full pl-14 pr-6 py-4 rounded-2xl bg-white border border-[#E8DCC4] focus:ring-2 focus:ring-[#D4AF37]/20 font-medium text-[#5C3D2E]" />
           </div>
-          <div className="flex gap-3">
-             <Button variant="outline" className="rounded-xl px-6 border-[#E8DCC4] text-[#B89E7E]">Filtres</Button>
-             <Button variant="outline" className="rounded-xl px-6 border-[#E8DCC4] text-[#B89E7E]">Exporter</Button>
-          </div>
         </div>
 
         <div className="overflow-x-auto">
           <table className="w-full text-left">
-             <thead className="bg-[#FAF3E0]/50 text-[#B89E7E] text-[10px] font-bold uppercase tracking-[0.2em]">
-                <tr>
-                   <th className="px-8 py-5">Collaboratrice</th>
-                   <th className="px-8 py-5">Rôle & Rang</th>
-                   <th className="px-8 py-5">Statut</th>
-                   <th className="px-8 py-5">Activités</th>
-                   <th className="px-8 py-5"></th>
+            <thead className="bg-[#FAF3E0]/50 text-[#B89E7E] text-[10px] font-bold uppercase tracking-[0.2em]">
+              <tr>
+                <th className="px-8 py-5">Collaboratrice</th>
+                <th className="px-8 py-5">Rôle & Rang</th>
+                <th className="px-8 py-5">Statut</th>
+                <th className="px-8 py-5">Activités</th>
+                <th className="px-8 py-5"></th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[#E8DCC4]/30">
+              {collaborators.map((user) => (
+                <tr key={user.id} className="user-row hover:bg-[#FAF3E0]/20 transition-colors group">
+                  <td className="px-8 py-6">
+                    <div className="flex items-center gap-4">
+                       <div className="w-12 h-12 rounded-2xl bg-[#5C3D2E] flex items-center justify-center text-white font-bold relative overflow-hidden">
+                          {user.displayName?.charAt(0) || "U"}
+                          <div className="absolute inset-0 dogon-pattern opacity-10" />
+                       </div>
+                       <div>
+                          <p className="font-bold text-[#5C3D2E]">{user.displayName || "Utilisateur"}</p>
+                          <p className="text-xs text-[#B89E7E]">{user.email}</p>
+                       </div>
+                    </div>
+                  </td>
+                  <td className="px-8 py-6">
+                    <div className="flex items-center gap-2">
+                       <ShieldCheck className="w-4 h-4 text-[#D4AF37]" />
+                       <span className="text-sm font-bold text-[#A66037] uppercase tracking-tighter">{user.role?.replace('_', ' ')}</span>
+                    </div>
+                  </td>
+                  <td className="px-8 py-6">
+                    <span className={`px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest ${
+                       user.active !== false ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"
+                    }`}>
+                       {user.active !== false ? "Active" : "Inactive"}
+                    </span>
+                  </td>
+                  <td className="px-8 py-6">
+                    <div className="flex flex-col gap-1">
+                       <div className="flex items-center gap-2">
+                          <Sparkles className="w-3 h-3 text-[#D4AF37]" />
+                          <span className="font-bold text-[#5C3D2E]">{user.entriesCount || 0}</span>
+                       </div>
+                    </div>
+                  </td>
+                  <td className="px-8 py-6 text-right">
+                    <button className="p-3 rounded-xl hover:bg-[#E8DCC4]/30 transition-colors text-[#B89E7E]">
+                       <MoreVertical className="w-5 h-5" />
+                    </button>
+                  </td>
                 </tr>
-             </thead>
-             <tbody className="divide-y divide-[#E8DCC4]/30">
-                {collaborators.map((user) => (
-                  <tr key={user.id} className="user-row hover:bg-[#FAF3E0]/20 transition-colors group">
-                     <td className="px-8 py-6">
-                        <div className="flex items-center gap-4">
-                           <div className="w-12 h-12 rounded-2xl bg-[#5C3D2E] flex items-center justify-center text-white font-bold relative overflow-hidden">
-                              {user.displayName?.charAt(0) || "U"}
-                              <div className="absolute inset-0 dogon-pattern opacity-10" />
-                           </div>
-                           <div>
-                              <p className="font-bold text-[#5C3D2E]">{user.displayName || "Utilisateur"}</p>
-                              <p className="text-xs text-[#B89E7E]">{user.email}</p>
-                           </div>
-                        </div>
-                     </td>
-                     <td className="px-8 py-6">
-                        <div className="flex items-center gap-2">
-                           <ShieldCheck className="w-4 h-4 text-[#D4AF37]" />
-                           <span className="text-sm font-bold text-[#A66037] uppercase tracking-tighter">{user.role?.replace('_', ' ')}</span>
-                        </div>
-                     </td>
-                     <td className="px-8 py-6">
-                        <span className={`px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest ${
-                           user.active !== false ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"
-                        }`}>
-                           {user.active !== false ? "Active" : "Inactive"}
-                        </span>
-                     </td>
-                     <td className="px-8 py-6">
-                        <div className="flex flex-col gap-1">
-                           <div className="flex items-center gap-2">
-                              <Sparkles className="w-3 h-3 text-[#D4AF37]" />
-                              <span className="font-bold text-[#5C3D2E]">{user.entriesCount || 0}</span>
-                           </div>
-                        </div>
-                     </td>
-                     <td className="px-8 py-6 text-right">
-                        <button className="p-3 rounded-xl hover:bg-[#E8DCC4]/30 transition-colors text-[#B89E7E]">
-                           <MoreVertical className="w-5 h-5" />
-                        </button>
-                     </td>
-                   </tr>
-                ))}
-             </tbody>
+              ))}
+              {collaborators.length === 0 && !loading && (
+                 <tr>
+                   <td colSpan={5} className="py-20 text-center italic text-[#B89E7E]">Aucun utilisateur trouvé dans les archives.</td>
+                 </tr>
+              )}
+            </tbody>
           </table>
-          {collaborators.length === 0 && !loading && (
-             <div className="py-20 text-center italic text-[#B89E7E]">Aucun utilisateur trouvé dans les archives.</div>
-          )}
         </div>
       </div>
+      <UserModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
     </div>
   );
 }

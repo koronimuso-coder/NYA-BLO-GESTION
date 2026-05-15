@@ -28,6 +28,22 @@ import { useGSAP } from "@gsap/react";
 import { collection, query, limit, onSnapshot, orderBy } from "firebase/firestore";
 import { db } from "@/lib/firebase/config";
 
+interface DashboardEntry {
+  id: string;
+  clientName: string;
+  totalAmount: number;
+  paidAmount: number;
+  companyId: string;
+  createdAt: string;
+}
+
+interface DashboardStats {
+  total: string;
+  paid: string;
+  pending: string;
+  conversion: string;
+}
+
 export default function DashboardPage() {
   const { profile, loading } = useAuth();
 
@@ -44,13 +60,12 @@ export default function DashboardPage() {
 
 
   useEffect(() => {
-    // Real-time listener for entries
-    const q = query(collection(db, "daily_entries"), orderBy("createdAt", "desc"), limit(5));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as DashboardEntry[];
-      setEntries(docs);
+    // Real-time listener for ALL entries for stats
+    const qAll = query(collection(db, "daily_entries"), orderBy("createdAt", "desc"));
+    const unsubscribe = onSnapshot(qAll, (snapshot) => {
+      const allDocs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as DashboardEntry[];
       
-      // Basic logic to sum totals from real data
+      // Update stats based on ALL data
       let t = 0;
       let p = 0;
       snapshot.docs.forEach(d => {
@@ -63,8 +78,11 @@ export default function DashboardPage() {
         total: t.toLocaleString(),
         paid: p.toLocaleString(),
         pending: (t - p).toLocaleString(),
-        conversion: t > 0 ? "100%" : "0%"
+        conversion: t > 0 ? Math.round((p / t) * 100) + "%" : "0%"
       });
+
+      // Update recent entries (last 5)
+      setEntries(allDocs.slice(0, 5));
     }, (error) => {
       console.error("Dashboard Real-time Error:", error);
     });
@@ -155,7 +173,16 @@ export default function DashboardPage() {
   );
 }
 
-const KpiCard = ({ title, value, trend, icon: Icon, subtitle }: any) => (
+interface KpiCardProps {
+  title: string;
+  value: string;
+  trend: string;
+  isPositive: boolean;
+  icon: React.ElementType;
+  subtitle: string;
+}
+
+const KpiCard = ({ title, value, trend, isPositive, icon: Icon, subtitle }: KpiCardProps) => (
 
   <div className="kpi-card bg-white p-6 rounded-[32px] shadow-premium border border-[#E8DCC4] relative overflow-hidden group">
     <div className="absolute top-0 right-0 w-24 h-24 bg-[#5C3D2E]/5 rounded-bl-[80px] -mr-6 -mt-6 group-hover:bg-[#5C3D2E]/10 transition-all duration-500" />
@@ -164,7 +191,9 @@ const KpiCard = ({ title, value, trend, icon: Icon, subtitle }: any) => (
         <div className="bg-[#5C3D2E]/5 p-3 rounded-2xl text-[#5C3D2E] group-hover:bg-[#5C3D2E] group-hover:text-white transition-all duration-300">
           <Icon className="w-6 h-6" />
         </div>
-        <div className="text-[10px] font-bold text-[#D4AF37] tracking-[0.2em] uppercase">{trend}</div>
+        <div className={`text-[10px] font-bold tracking-[0.2em] uppercase ${isPositive ? 'text-[#D4AF37]' : 'text-orange-600'}`}>
+          {trend}
+        </div>
       </div>
       <div>
         <p className="text-[#B89E7E] text-[10px] font-bold uppercase tracking-widest mb-1">{title}</p>
