@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useRef, useState, useEffect } from "react";
+import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import { 
   TrendingUp, 
@@ -61,6 +62,11 @@ export default function DashboardPage() {
      conversion: "0%",
      count: 0
   });
+  const [dateString, setDateString] = useState("");
+
+  useEffect(() => {
+    setDateString(new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }));
+  }, []);
 
   useEffect(() => {
     const qAll = query(collection(db, "daily_entries"), orderBy("createdAt", "desc"));
@@ -132,7 +138,7 @@ export default function DashboardPage() {
       <div className="page-header flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <p className="text-sm text-[#A66037] font-bold uppercase tracking-[0.2em] mb-1">
-            {new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+            {dateString || "\u00A0"}
           </p>
           <h1 className="text-3xl font-bold text-primary font-dogon uppercase tracking-tight">
             Bienvenue{profile?.displayName ? `, ${profile.displayName.split(' ')[0]}` : ''} 👋
@@ -190,9 +196,9 @@ export default function DashboardPage() {
         <div className="chart-box bg-white p-8 rounded-[40px] shadow-premium border border-[#E8DCC4]">
             <div className="flex items-center justify-between mb-8">
                <h3 className="font-bold text-xl text-primary font-dogon">Dernières Opérations</h3>
-               <button className="text-xs font-bold text-secondary uppercase tracking-[0.2em] flex items-center hover:translate-x-1 transition-transform">
+               <Link href="/dashboard/entries" className="text-xs font-bold text-secondary uppercase tracking-[0.2em] flex items-center hover:translate-x-1 transition-transform">
                   Historique complet <ArrowRight className="ml-1 w-4 h-4" />
-               </button>
+               </Link>
             </div>
             <div className="space-y-6">
                {recentEntries.map((entry) => (

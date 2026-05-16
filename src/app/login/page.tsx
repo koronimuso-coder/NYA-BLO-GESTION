@@ -1,12 +1,11 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
-
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { auth } from "@/lib/firebase/config";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
-import { ShieldCheck, Mail, Lock, Loader2, ArrowRight, Sparkles } from "lucide-react";
+import { ShieldCheck, Mail, Lock, Loader2, ArrowRight, Sparkles, Eye, EyeOff } from "lucide-react";
 import toast from "react-hot-toast";
 import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
@@ -15,6 +14,7 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const router = useRouter();
   const { user, loading } = useAuth();
   
@@ -27,7 +27,6 @@ export default function LoginPage() {
   }, [user, loading, router]);
 
   useGSAP(() => {
-
     const tl = gsap.timeline({ defaults: { ease: "power4.out" } });
     
     tl.from(".login-overlay", { opacity: 0, duration: 1.5 });
@@ -50,6 +49,10 @@ export default function LoginPage() {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!email.trim() || !password.trim()) {
+      toast.error("Veuillez remplir tous les champs.");
+      return;
+    }
     setIsLoading(true);
 
     try {
@@ -59,9 +62,22 @@ export default function LoginPage() {
     } catch (error: unknown) {
       console.error(error);
       const firebaseError = error as { code: string };
-      const message = firebaseError.code === "auth/invalid-credential" 
-        ? "Identifiants incorrects. Vérifiez vos accès Dogon."
-        : `Erreur: ${firebaseError.code}`;
+      let message = "Erreur de connexion";
+      switch (firebaseError.code) {
+        case "auth/invalid-credential":
+        case "auth/wrong-password":
+        case "auth/user-not-found":
+          message = "Identifiants incorrects. Vérifiez votre email et mot de passe.";
+          break;
+        case "auth/too-many-requests":
+          message = "Trop de tentatives. Veuillez patienter quelques minutes.";
+          break;
+        case "auth/network-request-failed":
+          message = "Erreur réseau. Vérifiez votre connexion internet.";
+          break;
+        default:
+          message = `Erreur: ${firebaseError.code}`;
+      }
       toast.error(message);
     } finally {
       setIsLoading(false);
@@ -74,7 +90,6 @@ export default function LoginPage() {
     </div>
   );
 
-
   return (
     <div ref={container} className="relative min-h-screen flex items-center justify-center bg-[#1A0F0A] overflow-hidden">
       {/* Immersive Dogon Background */}
@@ -84,12 +99,12 @@ export default function LoginPage() {
         <div className="absolute inset-0 dogon-pattern opacity-10" />
       </div>
 
-      <div className="login-content relative z-10 w-full max-w-5xl flex flex-col md:flex-row bg-[#FAF3E0]/5 backdrop-blur-2xl rounded-[48px] border border-white/10 overflow-hidden shadow-[0_50px_100px_-20px_rgba(0,0,0,0.5)]">
+      <div className="login-content relative z-10 w-full max-w-5xl flex flex-col md:flex-row bg-[#FAF3E0]/5 backdrop-blur-2xl rounded-[48px] border border-white/10 overflow-hidden shadow-[0_50px_100px_-20px_rgba(0,0,0,0.5)] mx-4">
         
         {/* Left Side: Brand Experience */}
         <div className="md:w-1/2 p-12 lg:p-20 flex flex-col justify-between bg-gradient-to-br from-[#5C3D2E]/40 to-transparent">
           <div className="flex items-center gap-4 login-form">
-            <div className="w-14 h-14 bg-[#D4AF37] rounded-2xl flex items-center justify-center shadow-lg shadow-[#D4AF37]/20">
+            <div className="w-14 h-14 bg-[#D4AF37] rounded-2xl flex items-center justify-center shadow-lg shadow-[#D4AF37]/20 glow-gold">
                <ShieldCheck className="w-8 h-8 text-[#1A0F0A]" />
             </div>
             <h1 className="text-3xl font-bold font-dogon text-white tracking-widest uppercase">NYA BLO</h1>
@@ -99,7 +114,7 @@ export default function LoginPage() {
             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#D4AF37]/10 border border-[#D4AF37]/20 text-[#D4AF37] text-xs font-bold uppercase tracking-[0.2em] mb-8">
               <Sparkles className="w-3 h-3" /> Architecture de Gestion
             </div>
-            <h2 className="text-6xl font-bold text-white leading-[1.1] font-dogon mb-6">
+            <h2 className="text-5xl lg:text-6xl font-bold text-white leading-[1.1] font-dogon mb-6">
               L&apos;harmonie de la <span className="text-[#A66037]">Terre</span> au service de vos <span className="text-[#D4AF37]">Ventes</span>.
             </h2>
             <p className="text-[#B89E7E] text-lg max-w-md leading-relaxed">
@@ -109,7 +124,7 @@ export default function LoginPage() {
           
           <div className="flex items-center gap-4 text-white/40 text-sm font-medium">
              <div className="h-px flex-1 bg-white/10" />
-             © 2024 NYA BLO SARL
+             © {new Date().getFullYear()} NYA BLO SARL
           </div>
         </div>
 
@@ -141,29 +156,37 @@ export default function LoginPage() {
               <div className="relative group">
                 <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-300 group-focus-within:text-[#D4AF37] transition-colors" />
                 <input
-                  type="password"
+                  type={showPassword ? "text" : "password"}
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pl-12 pr-4 py-5 rounded-[24px] bg-[#FAF3E0]/30 border-2 border-transparent focus:border-[#D4AF37] focus:bg-white outline-none transition-all font-medium"
+                  className="w-full pl-12 pr-12 py-5 rounded-[24px] bg-[#FAF3E0]/30 border-2 border-transparent focus:border-[#D4AF37] focus:bg-white outline-none transition-all font-medium"
                   placeholder="••••••••"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300 hover:text-[#A66037] transition-colors"
+                >
+                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                </button>
               </div>
             </div>
 
-            <Button
+            <button
               type="submit"
               disabled={isLoading}
-              className="form-element w-full py-6 rounded-[24px] dogon-gradient text-white text-lg font-bold shadow-xl shadow-[#A66037]/30 hover:shadow-2xl hover:shadow-[#A66037]/50 mt-4 h-auto"
+              className="form-element w-full py-6 rounded-[24px] dogon-gradient text-white text-lg font-bold shadow-xl shadow-[#A66037]/30 hover:shadow-2xl hover:shadow-[#A66037]/50 mt-4 relative overflow-hidden group transition-all active:scale-95 disabled:opacity-50 disabled:active:scale-100"
             >
+              <div className="absolute inset-0 bg-white/10 translate-x-full group-hover:translate-x-0 transition-transform duration-500" />
               {isLoading ? (
-                <Loader2 className="w-6 h-6 animate-spin mx-auto" />
+                <Loader2 className="w-6 h-6 animate-spin mx-auto relative z-10" />
               ) : (
-                <span className="flex items-center justify-center gap-3">
+                <span className="flex items-center justify-center gap-3 relative z-10">
                   Accéder au Dashboard <ArrowRight className="w-5 h-5" />
                 </span>
               )}
-            </Button>
+            </button>
           </form>
 
           <p className="form-element mt-12 text-center text-slate-400 text-sm">
@@ -172,14 +195,5 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
-  );
-}
-
-function Button({ children, className, ...props }: any) {
-  return (
-    <button className={`relative overflow-hidden group transition-all active:scale-95 ${className}`} {...props}>
-       <div className="absolute inset-0 bg-white/10 translate-x-full group-hover:translate-x-0 transition-transform duration-500" />
-       <span className="relative z-10">{children}</span>
-    </button>
   );
 }

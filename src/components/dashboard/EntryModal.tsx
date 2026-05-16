@@ -1,10 +1,10 @@
 "use client";
 
 import React, { useRef, useState, useEffect } from "react";
-import { X, Save, TrendingUp, CreditCard, User, Building2, Sparkles, Loader2, Calendar, Phone, MapPin, MessageSquare, ShieldCheck, Zap, Plus, Trash2 } from "lucide-react";
+import { X, Save, Plus, Trash2, Sparkles, Loader2 } from "lucide-react";
 import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
-import { collection, addDoc, serverTimestamp, getDocs, query, orderBy, doc, increment, updateDoc } from "firebase/firestore";
+import { collection, addDoc, serverTimestamp, getDocs, query, orderBy, doc, increment, updateDoc, deleteDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase/config";
 import { useAuth } from "@/context/AuthContext";
 import toast from "react-hot-toast";
@@ -12,6 +12,27 @@ import toast from "react-hot-toast";
 interface EntryModalProps {
   isOpen: boolean;
   onClose: () => void;
+  editEntry?: EditableEntry | null;
+}
+
+export interface EditableEntry {
+  id: string;
+  date: string;
+  companyId: string;
+  session: string;
+  localisation: string;
+  status: string;
+  prochaineAction: string;
+  observation: string;
+  clientName: string;
+  clientContact: string;
+  engin: string;
+  motif: string;
+  totalAmount: number;
+  paidAmount: number;
+  resteAVerser: number;
+  canal: string;
+  modePaiement: string;
 }
 
 interface Company {
@@ -31,7 +52,19 @@ interface EntryItem {
   modePaiement: string;
 }
 
-const EntryModal = ({ isOpen, onClose }: EntryModalProps) => {
+const createEmptyItem = (): EntryItem => ({
+  id: Math.random().toString(),
+  clientName: "",
+  clientContact: "",
+  engin: "",
+  motif: "",
+  totalAmount: "",
+  paidAmount: "",
+  canal: "Direct",
+  modePaiement: "Espèces"
+});
+
+const EntryModal = ({ isOpen, onClose, editEntry }: EntryModalProps) => {
   const { profile } = useAuth();
   const overlayRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -50,9 +83,45 @@ const EntryModal = ({ isOpen, onClose }: EntryModalProps) => {
   });
 
   // Individual Entries
-  const [items, setItems] = useState<EntryItem[]>([
-    { id: '1', clientName: "", clientContact: "", engin: "", motif: "", totalAmount: "", paidAmount: "", canal: "Direct", modePaiement: "Espèces" }
-  ]);
+  const [items, setItems] = useState<EntryItem[]>([createEmptyItem()]);
+
+  // If editing, populate form
+  useEffect(() => {
+    if (editEntry && isOpen) {
+      setCommonData({
+        date: editEntry.date || new Date().toISOString().split('T')[0],
+        companyId: editEntry.companyId || "",
+        session: editEntry.session || "Matin",
+        localisation: editEntry.localisation || "Abidjan",
+        status: editEntry.status || "Confirmé",
+        prochaineAction: editEntry.prochaineAction || "",
+        observation: editEntry.observation || ""
+      });
+      setItems([{
+        id: editEntry.id,
+        clientName: editEntry.clientName || "",
+        clientContact: editEntry.clientContact || "",
+        engin: editEntry.engin || "",
+        motif: editEntry.motif || "",
+        totalAmount: String(editEntry.totalAmount || ""),
+        paidAmount: String(editEntry.paidAmount || ""),
+        canal: editEntry.canal || "Direct",
+        modePaiement: editEntry.modePaiement || "Espèces"
+      }]);
+    } else if (!editEntry && isOpen) {
+      // Reset for new entry
+      setCommonData({
+        date: new Date().toISOString().split('T')[0],
+        companyId: companies.length > 0 ? companies[0].name : "",
+        session: "Matin",
+        localisation: "Abidjan",
+        status: "Confirmé",
+        prochaineAction: "",
+        observation: ""
+      });
+      setItems([createEmptyItem()]);
+    }
+  }, [editEntry, isOpen]);
 
   useEffect(() => {
     const fetchCompanies = async () => {
@@ -61,7 +130,7 @@ const EntryModal = ({ isOpen, onClose }: EntryModalProps) => {
         const snapshot = await getDocs(q);
         const list = snapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name }));
         setCompanies(list);
-        if (list.length > 0 && !commonData.companyId) {
+        if (list.length > 0 && !commonData.companyId && !editEntry) {
            setCommonData(prev => ({ ...prev, companyId: list[0].name }));
         }
       } catch (error) {
@@ -82,7 +151,7 @@ const EntryModal = ({ isOpen, onClose }: EntryModalProps) => {
   }, { dependencies: [isOpen] });
 
   const addItem = () => {
-    setItems([...items, { id: Math.random().toString(), clientName: "", clientContact: "", engin: "", motif: "", totalAmount: "", paidAmount: "", canal: "Direct", modePaiement: "Espèces" }]);
+    setItems([...items, createEmptyItem()]);
   };
 
   const removeItem = (id: string) => {
@@ -95,41 +164,87 @@ const EntryModal = ({ isOpen, onClose }: EntryModalProps) => {
     setItems(items.map(item => item.id === id ? { ...item, [field]: value } : item));
   };
 
+  const handleDelete = async () => {
+    if (!editEntry) return;
+    if (!confirm("Êtes-vous sûr de vouloir supprimer cette saisie ?")) return;
+    
+    setLoading(true);
+    try {
+      await deleteDoc(doc(db, "daily_entries", editEntry.id));
+      toast.success("Saisie supprimée avec succès !");
+      onClose();
+    } catch (error) {
+      console.error(error);
+      toast.error("Erreur lors de la suppression.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
     try {
-      // Pour chaque personne dans la liste, on crée une entrée Firestore
-      const promises = items.map(item => {
+      if (editEntry) {
+        // Update existing entry
+        const item = items[0];
         const total = Number(item.totalAmount) || 0;
         const paid = Number(item.paidAmount) || 0;
-        return addDoc(collection(db, "daily_entries"), {
+        
+        await updateDoc(doc(db, "daily_entries", editEntry.id), {
           ...commonData,
-          ...item,
+          clientName: item.clientName,
+          clientContact: item.clientContact,
+          engin: item.engin,
+          motif: item.motif,
           totalAmount: total,
           paidAmount: paid,
           resteAVerser: total - paid,
-          createdAt: new Date().toISOString(),
-          serverTimestamp: serverTimestamp()
+          canal: item.canal,
+          modePaiement: item.modePaiement,
+          updatedAt: new Date().toISOString()
         });
-      });
+        
+        toast.success("Saisie mise à jour !");
+      } else {
+        // Create new entries
+        const promises = items.map(item => {
+          const total = Number(item.totalAmount) || 0;
+          const paid = Number(item.paidAmount) || 0;
+          return addDoc(collection(db, "daily_entries"), {
+            ...commonData,
+            clientName: item.clientName,
+            clientContact: item.clientContact,
+            engin: item.engin,
+            motif: item.motif,
+            totalAmount: total,
+            paidAmount: paid,
+            resteAVerser: total - paid,
+            canal: item.canal,
+            modePaiement: item.modePaiement,
+            createdAt: new Date().toISOString(),
+            serverTimestamp: serverTimestamp()
+          });
+        });
 
-      await Promise.all(promises);
-      
-      // Update user's entriesCount
-      if (profile?.uid) {
-        const userRef = doc(db, "users", profile.uid);
-        await updateDoc(userRef, {
-          entriesCount: increment(items.length)
-        });
+        await Promise.all(promises);
+        
+        // Update user's entriesCount
+        if (profile?.uid) {
+          const userRef = doc(db, "users", profile.uid);
+          await updateDoc(userRef, {
+            entriesCount: increment(items.length)
+          }).catch(() => {}); // silently fail if user doc doesn't have field
+        }
+        
+        toast.success(`${items.length} saisie(s) enregistrée(s) !`);
       }
       
-      toast.success(`${items.length} saisie(s) enregistrée(s) !`);
       onClose();
-      // Reset
-      setItems([{ id: '1', clientName: "", clientContact: "", engin: "", motif: "", totalAmount: "", paidAmount: "", canal: "Direct", modePaiement: "Espèces" }]);
-    } catch (error: any) {
+      setItems([createEmptyItem()]);
+    } catch (error: unknown) {
+      console.error(error);
       toast.error("Erreur lors de l'enregistrement.");
     } finally {
       setLoading(false);
@@ -137,6 +252,8 @@ const EntryModal = ({ isOpen, onClose }: EntryModalProps) => {
   };
 
   if (!isOpen) return null;
+
+  const isEditing = !!editEntry;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -158,8 +275,12 @@ const EntryModal = ({ isOpen, onClose }: EntryModalProps) => {
                 <Sparkles className="w-6 h-6 text-[#5C3D2E]" />
              </div>
              <div>
-                <h2 className="text-2xl font-bold font-dogon tracking-tight">Nouvelle Saisie Groupée</h2>
-                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#D4AF37]">Enregistrez plusieurs personnes en une fois</p>
+                <h2 className="text-2xl font-bold font-dogon tracking-tight">
+                  {isEditing ? "Modifier la Saisie" : "Nouvelle Saisie Groupée"}
+                </h2>
+                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#D4AF37]">
+                  {isEditing ? "Mise à jour des données" : "Enregistrez plusieurs personnes en une fois"}
+                </p>
              </div>
           </div>
           <button type="button" onClick={onClose} className="relative z-10 p-3 rounded-2xl bg-white/10 hover:bg-white/20 transition-all">
@@ -168,8 +289,8 @@ const EntryModal = ({ isOpen, onClose }: EntryModalProps) => {
         </div>
 
         {/* Form Body */}
-        <div className="p-8 overflow-y-auto space-y-8 custom-scrollbar">
-           <form onSubmit={handleSubmit} className="space-y-8">
+        <div className="flex-1 overflow-y-auto custom-scrollbar">
+           <form onSubmit={handleSubmit} className="p-8 space-y-8">
               {/* Common Fields Row */}
               <div className="bg-white/50 p-6 rounded-[32px] border border-[#E8DCC4] grid grid-cols-1 md:grid-cols-4 gap-6">
                  <div className="space-y-2">
@@ -178,7 +299,7 @@ const EntryModal = ({ isOpen, onClose }: EntryModalProps) => {
                       type="date" 
                       value={commonData.date}
                       onChange={(e) => setCommonData({...commonData, date: e.target.value})}
-                      className="w-full px-4 py-3 rounded-xl bg-white border-none focus:ring-2 focus:ring-[#D4AF37]/20 font-bold text-sm" 
+                      className="w-full px-4 py-3 rounded-xl bg-white border border-[#E8DCC4] focus:ring-2 focus:ring-[#D4AF37]/20 focus:border-[#D4AF37] font-bold text-sm outline-none transition-all" 
                     />
                  </div>
                  <div className="space-y-2">
@@ -186,8 +307,9 @@ const EntryModal = ({ isOpen, onClose }: EntryModalProps) => {
                     <select 
                       value={commonData.companyId}
                       onChange={(e) => setCommonData({...commonData, companyId: e.target.value})}
-                      className="w-full px-4 py-3 rounded-xl bg-white border-none focus:ring-2 focus:ring-[#D4AF37]/20 font-bold text-sm appearance-none"
+                      className="w-full px-4 py-3 rounded-xl bg-white border border-[#E8DCC4] focus:ring-2 focus:ring-[#D4AF37]/20 focus:border-[#D4AF37] font-bold text-sm appearance-none outline-none transition-all"
                     >
+                       {companies.length === 0 && <option value="">Aucune entreprise</option>}
                        {companies.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
                     </select>
                  </div>
@@ -196,7 +318,7 @@ const EntryModal = ({ isOpen, onClose }: EntryModalProps) => {
                     <select 
                       value={commonData.session}
                       onChange={(e) => setCommonData({...commonData, session: e.target.value})}
-                      className="w-full px-4 py-3 rounded-xl bg-white border-none focus:ring-2 focus:ring-[#D4AF37]/20 font-bold text-sm"
+                      className="w-full px-4 py-3 rounded-xl bg-white border border-[#E8DCC4] focus:ring-2 focus:ring-[#D4AF37]/20 focus:border-[#D4AF37] font-bold text-sm outline-none transition-all"
                     >
                        <option>Matin</option>
                        <option>Après-midi</option>
@@ -208,7 +330,7 @@ const EntryModal = ({ isOpen, onClose }: EntryModalProps) => {
                     <input 
                       value={commonData.localisation}
                       onChange={(e) => setCommonData({...commonData, localisation: e.target.value})}
-                      className="w-full px-4 py-3 rounded-xl bg-white border-none focus:ring-2 focus:ring-[#D4AF37]/20 font-bold text-sm" 
+                      className="w-full px-4 py-3 rounded-xl bg-white border border-[#E8DCC4] focus:ring-2 focus:ring-[#D4AF37]/20 focus:border-[#D4AF37] font-bold text-sm outline-none transition-all" 
                       placeholder="Abidjan" 
                     />
                  </div>
@@ -217,14 +339,18 @@ const EntryModal = ({ isOpen, onClose }: EntryModalProps) => {
               {/* Items List */}
               <div className="space-y-4">
                  <div className="flex justify-between items-center px-2">
-                    <h3 className="text-xs font-bold text-[#5C3D2E] uppercase tracking-widest">Liste des Personnes</h3>
-                    <button 
-                      type="button" 
-                      onClick={addItem}
-                      className="flex items-center gap-2 px-4 py-2 bg-[#A66037] text-white rounded-xl text-xs font-bold hover:scale-105 transition-all shadow-lg"
-                    >
-                       <Plus className="w-4 h-4" /> Ajouter une ligne
-                    </button>
+                    <h3 className="text-xs font-bold text-[#5C3D2E] uppercase tracking-widest">
+                      {isEditing ? "Détails de la Saisie" : "Liste des Personnes"}
+                    </h3>
+                    {!isEditing && (
+                      <button 
+                        type="button" 
+                        onClick={addItem}
+                        className="flex items-center gap-2 px-4 py-2 bg-[#A66037] text-white rounded-xl text-xs font-bold hover:scale-105 transition-all shadow-lg"
+                      >
+                         <Plus className="w-4 h-4" /> Ajouter une ligne
+                      </button>
+                    )}
                  </div>
 
                  <div className="space-y-4">
@@ -236,7 +362,7 @@ const EntryModal = ({ isOpen, onClose }: EntryModalProps) => {
                                required
                                value={item.clientName}
                                onChange={(e) => updateItem(item.id, 'clientName', e.target.value)}
-                               className="w-full px-4 py-3 rounded-xl bg-[#FAF3E0]/30 border-none focus:ring-2 focus:ring-[#D4AF37]/20 font-bold text-sm" 
+                               className="w-full px-4 py-3 rounded-xl bg-[#FAF3E0]/30 border border-[#E8DCC4] focus:ring-2 focus:ring-[#D4AF37]/20 focus:border-[#D4AF37] font-bold text-sm outline-none transition-all" 
                              />
                           </div>
                           <div className="md:col-span-1 space-y-2">
@@ -244,7 +370,7 @@ const EntryModal = ({ isOpen, onClose }: EntryModalProps) => {
                              <input 
                                value={item.engin}
                                onChange={(e) => updateItem(item.id, 'engin', e.target.value)}
-                               className="w-full px-4 py-3 rounded-xl bg-[#FAF3E0]/30 border-none focus:ring-2 focus:ring-[#D4AF37]/20 font-bold text-sm" 
+                               className="w-full px-4 py-3 rounded-xl bg-[#FAF3E0]/30 border border-[#E8DCC4] focus:ring-2 focus:ring-[#D4AF37]/20 focus:border-[#D4AF37] font-bold text-sm outline-none transition-all" 
                              />
                           </div>
                           <div className="md:col-span-1 space-y-2">
@@ -252,7 +378,7 @@ const EntryModal = ({ isOpen, onClose }: EntryModalProps) => {
                              <input 
                                value={item.motif}
                                onChange={(e) => updateItem(item.id, 'motif', e.target.value)}
-                               className="w-full px-4 py-3 rounded-xl bg-[#FAF3E0]/30 border-none focus:ring-1 focus:ring-[#D4AF37]/20 font-bold text-sm" 
+                               className="w-full px-4 py-3 rounded-xl bg-[#FAF3E0]/30 border border-[#E8DCC4] focus:ring-2 focus:ring-[#D4AF37]/20 focus:border-[#D4AF37] font-bold text-sm outline-none transition-all" 
                              />
                           </div>
                           <div className="md:col-span-1 space-y-2">
@@ -262,7 +388,7 @@ const EntryModal = ({ isOpen, onClose }: EntryModalProps) => {
                                required
                                value={item.totalAmount}
                                onChange={(e) => updateItem(item.id, 'totalAmount', e.target.value)}
-                               className="w-full px-4 py-3 rounded-xl bg-[#FAF3E0]/30 border-none focus:ring-1 focus:ring-[#D4AF37]/20 font-bold text-sm text-primary" 
+                               className="w-full px-4 py-3 rounded-xl bg-[#FAF3E0]/30 border border-[#E8DCC4] focus:ring-2 focus:ring-[#D4AF37]/20 focus:border-[#D4AF37] font-bold text-sm text-primary outline-none transition-all" 
                              />
                           </div>
                           <div className="md:col-span-1 space-y-2">
@@ -272,7 +398,7 @@ const EntryModal = ({ isOpen, onClose }: EntryModalProps) => {
                                required
                                value={item.paidAmount}
                                onChange={(e) => updateItem(item.id, 'paidAmount', e.target.value)}
-                               className="w-full px-4 py-3 rounded-xl bg-[#FAF3E0]/30 border-none focus:ring-1 focus:ring-[#D4AF37]/20 font-bold text-sm text-emerald-600" 
+                               className="w-full px-4 py-3 rounded-xl bg-[#FAF3E0]/30 border border-[#E8DCC4] focus:ring-2 focus:ring-[#D4AF37]/20 focus:border-[#D4AF37] font-bold text-sm text-emerald-600 outline-none transition-all" 
                              />
                           </div>
                           <div className="md:col-span-1 space-y-2">
@@ -280,7 +406,7 @@ const EntryModal = ({ isOpen, onClose }: EntryModalProps) => {
                              <select 
                                value={item.canal}
                                onChange={(e) => updateItem(item.id, 'canal', e.target.value)}
-                               className="w-full px-3 py-3 rounded-xl bg-[#FAF3E0]/30 border-none text-xs font-bold appearance-none"
+                               className="w-full px-3 py-3 rounded-xl bg-[#FAF3E0]/30 border border-[#E8DCC4] text-xs font-bold appearance-none outline-none transition-all"
                              >
                                 <option>Social</option>
                                 <option>Direct</option>
@@ -293,19 +419,21 @@ const EntryModal = ({ isOpen, onClose }: EntryModalProps) => {
                                 <select 
                                   value={item.modePaiement}
                                   onChange={(e) => updateItem(item.id, 'modePaiement', e.target.value)}
-                                  className="w-full px-3 py-3 rounded-xl bg-[#FAF3E0]/30 border-none text-sm font-bold appearance-none"
+                                  className="w-full px-3 py-3 rounded-xl bg-[#FAF3E0]/30 border border-[#E8DCC4] text-sm font-bold appearance-none outline-none transition-all"
                                 >
                                    <option>Espèces</option>
                                    <option>Wave</option>
                                    <option>OM</option>
                                    <option>Momo</option>
+                                   <option>Virement</option>
+                                   <option>Chèque</option>
                                 </select>
                              </div>
                              {items.length > 1 && (
                                 <button 
                                   type="button" 
                                   onClick={() => removeItem(item.id)}
-                                  className="p-3 bg-red-50 text-red-500 rounded-xl hover:bg-red-500 hover:text-white transition-all flex items-center justify-center mb-0"
+                                  className="p-3 bg-red-50 text-red-500 rounded-xl hover:bg-red-500 hover:text-white transition-all flex items-center justify-center self-end"
                                 >
                                    <Trash2 className="w-4 h-4" />
                                 </button>
@@ -317,13 +445,13 @@ const EntryModal = ({ isOpen, onClose }: EntryModalProps) => {
               </div>
 
               {/* Action Fields (shared) */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-20">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                  <div className="space-y-2">
                     <label className="text-[10px] font-bold text-[#A66037] uppercase tracking-widest pl-1">Prochaine Action Globale</label>
                     <input 
                       value={commonData.prochaineAction}
                       onChange={(e) => setCommonData({...commonData, prochaineAction: e.target.value})}
-                      className="w-full px-4 py-4 rounded-2xl bg-white border border-[#E8DCC4] focus:ring-2 focus:ring-[#D4AF37]/20 font-bold text-sm" 
+                      className="w-full px-4 py-4 rounded-2xl bg-white border border-[#E8DCC4] focus:ring-2 focus:ring-[#D4AF37]/20 focus:border-[#D4AF37] font-bold text-sm outline-none transition-all" 
                       placeholder="Ex: Confirmer les livraisons demain" 
                     />
                  </div>
@@ -332,28 +460,42 @@ const EntryModal = ({ isOpen, onClose }: EntryModalProps) => {
                     <input 
                       value={commonData.observation}
                       onChange={(e) => setCommonData({...commonData, observation: e.target.value})}
-                      className="w-full px-4 py-4 rounded-2xl bg-white border border-[#E8DCC4] focus:ring-2 focus:ring-[#D4AF37]/20 font-bold text-sm" 
+                      className="w-full px-4 py-4 rounded-2xl bg-white border border-[#E8DCC4] focus:ring-2 focus:ring-[#D4AF37]/20 focus:border-[#D4AF37] font-bold text-sm outline-none transition-all" 
                       placeholder="Note particulière..." 
                     />
                  </div>
               </div>
 
-              {/* Submit Footer */}
-              <div className="fixed bottom-0 left-0 right-0 p-8 bg-[#FAF3E0]/80 backdrop-blur-md border-t border-[#E8DCC4] z-20 flex justify-end gap-4 rounded-b-[48px]">
-                 <button 
-                   type="button" 
-                   onClick={onClose}
-                   className="px-8 h-14 rounded-2xl border-2 border-[#E8DCC4] text-[#A66037] font-bold"
-                 >
-                   Annuler
-                 </button>
-                 <button 
-                   type="submit" 
-                   disabled={loading}
-                   className="px-12 h-14 rounded-2xl dogon-gradient text-white font-bold text-lg shadow-xl disabled:opacity-50 flex items-center gap-3"
-                 >
-                   {loading ? <Loader2 className="w-6 h-6 animate-spin" /> : <><Save className="w-6 h-6" /> Enregistrer {items.length} Saisies</>}
-                 </button>
+              {/* Submit Footer - NO LONGER position:fixed! */}
+              <div className="sticky bottom-0 p-6 bg-[#FAF3E0]/95 backdrop-blur-md border-t border-[#E8DCC4] -mx-8 -mb-8 flex justify-between items-center gap-4">
+                 <div>
+                   {isEditing && (
+                     <button 
+                       type="button" 
+                       onClick={handleDelete}
+                       disabled={loading}
+                       className="px-6 h-14 rounded-2xl bg-red-50 text-red-600 font-bold hover:bg-red-600 hover:text-white transition-all flex items-center gap-2"
+                     >
+                       <Trash2 className="w-5 h-5" /> Supprimer
+                     </button>
+                   )}
+                 </div>
+                 <div className="flex gap-4">
+                   <button 
+                     type="button" 
+                     onClick={onClose}
+                     className="px-8 h-14 rounded-2xl border-2 border-[#E8DCC4] text-[#A66037] font-bold hover:bg-[#E8DCC4]/30 transition-all"
+                   >
+                     Annuler
+                   </button>
+                   <button 
+                     type="submit" 
+                     disabled={loading}
+                     className="px-12 h-14 rounded-2xl dogon-gradient text-white font-bold text-lg shadow-xl disabled:opacity-50 flex items-center gap-3 hover:shadow-2xl transition-all"
+                   >
+                     {loading ? <Loader2 className="w-6 h-6 animate-spin" /> : <><Save className="w-6 h-6" /> {isEditing ? "Mettre à jour" : `Enregistrer ${items.length} Saisie(s)`}</>}
+                   </button>
+                 </div>
               </div>
            </form>
         </div>

@@ -3,26 +3,30 @@
 import React, { useState, useRef, useEffect } from "react";
 import { 
   Search, 
-  MoreVertical,
   Target,
   LayoutGrid,
   TrendingUp,
   Plus,
   Loader2,
-  AlertCircle
+  AlertCircle,
+  Edit3,
+  Trash2,
+  MoreVertical,
+  Eye
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
-
-import EntryModal from "@/components/dashboard/EntryModal";
+import EntryModal, { type EditableEntry } from "@/components/dashboard/EntryModal";
 import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
-import { collection, query, onSnapshot, orderBy } from "firebase/firestore";
+import { collection, query, onSnapshot, orderBy, deleteDoc, doc } from "firebase/firestore";
 import { db } from "@/lib/firebase/config";
+import toast from "react-hot-toast";
 
 interface Entry {
   id: string;
   date: string;
   clientName: string;
+  clientContact: string;
   companyId: string;
   totalAmount: number;
   paidAmount: number;
@@ -30,10 +34,18 @@ interface Entry {
   status: string;
   modePaiement: string;
   canal: string;
+  session: string;
+  localisation: string;
+  prochaineAction: string;
+  observation: string;
+  engin: string;
+  motif: string;
 }
 
 export default function EntriesPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editEntry, setEditEntry] = useState<EditableEntry | null>(null);
+  const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
   const container = useRef<HTMLDivElement>(null);
   const [entries, setEntries] = useState<Entry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -63,6 +75,15 @@ export default function EntriesPage() {
     return () => unsubscribe();
   }, []);
 
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = () => setActiveDropdown(null);
+    if (activeDropdown) {
+      document.addEventListener("click", handleClickOutside);
+      return () => document.removeEventListener("click", handleClickOutside);
+    }
+  }, [activeDropdown]);
+
   const filteredEntries = entries.filter(e => 
     e.clientName?.toLowerCase().includes(searchTerm.toLowerCase()) || 
     e.companyId?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -78,6 +99,29 @@ export default function EntriesPage() {
       tl.from(".table-row", { opacity: 0, y: 10, stagger: 0.05, duration: 0.4 });
     }
   }, { scope: container, dependencies: [loading] });
+
+  const handleEdit = (entry: Entry) => {
+    setEditEntry(entry as EditableEntry);
+    setIsModalOpen(true);
+    setActiveDropdown(null);
+  };
+
+  const handleDelete = async (entryId: string) => {
+    if (!confirm("Êtes-vous sûr de vouloir supprimer cette saisie ?")) return;
+    try {
+      await deleteDoc(doc(db, "daily_entries", entryId));
+      toast.success("Saisie supprimée !");
+    } catch (error) {
+      console.error(error);
+      toast.error("Erreur lors de la suppression.");
+    }
+    setActiveDropdown(null);
+  };
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setEditEntry(null);
+  };
 
   if (loading) return (
     <div className="min-h-[60vh] flex flex-col items-center justify-center">
@@ -99,7 +143,7 @@ export default function EntriesPage() {
            <Button 
               variant="gold" 
               className="rounded-2xl shadow-gold h-14 relative z-20"
-              onClick={() => setIsModalOpen(true)}
+              onClick={() => { setEditEntry(null); setIsModalOpen(true); }}
            >
               <Plus className="w-5 h-5 mr-2" />
               Nouvelle Saisie Réelle
@@ -114,7 +158,7 @@ export default function EntriesPage() {
             { label: "Total Encaissé", value: entries.reduce((acc, curr) => acc + Number(curr.paidAmount || 0), 0).toLocaleString() + " FCFA", icon: Target, color: "text-[#D4AF37]" },
             { label: "Total Reste", value: entries.reduce((acc, curr) => acc + Number(curr.resteAVerser || 0), 0).toLocaleString() + " FCFA", icon: AlertCircle, color: "text-red-500" },
          ].map((stat, i) => (
-            <div key={i} className="bg-white p-5 rounded-3xl shadow-premium border border-[#E8DCC4] flex items-center gap-4">
+            <div key={i} className="bg-white p-5 rounded-3xl shadow-premium border border-[#E8DCC4] flex items-center gap-4 hover:shadow-dogon hover:-translate-y-1 transition-all duration-300">
                <div className="w-12 h-12 bg-[#FAF3E0] rounded-2xl flex items-center justify-center text-[#5C3D2E] border border-[#E8DCC4]">
                   <stat.icon className="w-6 h-6" />
                </div>
@@ -135,9 +179,10 @@ export default function EntriesPage() {
               placeholder="Rechercher par client, filiale ou statut..." 
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-11 pr-4 py-3.5 rounded-2xl bg-[#FAF3E0]/30 border-none focus:ring-2 focus:ring-[#D4AF37]/20 text-sm font-medium"
+              className="w-full pl-11 pr-4 py-3.5 rounded-2xl bg-[#FAF3E0]/30 border border-[#E8DCC4] focus:ring-2 focus:ring-[#D4AF37]/20 focus:border-[#D4AF37] text-sm font-medium outline-none transition-all"
             />
           </div>
+          <p className="text-sm font-bold text-[#B89E7E]">{filteredEntries.length} résultat(s)</p>
         </div>
 
         <div className="overflow-x-auto">
@@ -159,13 +204,15 @@ export default function EntriesPage() {
             <tbody className="divide-y divide-[#E8DCC4]/20">
               {filteredEntries.map((entry) => (
                 <tr key={entry.id} className="table-row hover:bg-[#FAF3E0]/30 transition-colors group">
-                  <td className="px-8 py-6 font-bold text-[#5C3D2E] text-sm whitespace-nowrap">{new Date(entry.date).toLocaleDateString()}</td>
+                  <td className="px-8 py-6 font-bold text-[#5C3D2E] text-sm whitespace-nowrap">
+                    {entry.date ? new Date(entry.date).toLocaleDateString('fr-FR') : "--"}
+                  </td>
                   <td className="px-8 py-6">
                     <div className="flex items-center gap-3">
                        <div className="w-8 h-8 rounded-full bg-[#5C3D2E] text-[#FAF3E0] flex items-center justify-center text-[10px] font-bold">
                           {entry.clientName?.substring(0, 2).toUpperCase() || "C"}
                        </div>
-                       <span className="font-semibold text-[#2D1A12] text-sm whitespace-nowrap">{entry.clientName}</span>
+                       <span className="font-semibold text-[#2D1A12] text-sm whitespace-nowrap">{entry.clientName || "Client inconnu"}</span>
                     </div>
                   </td>
                   <td className="px-8 py-6">
@@ -194,17 +241,34 @@ export default function EntriesPage() {
                        {entry.status || 'Confirmé'}
                     </span>
                   </td>
-                  <td className="px-8 py-6 text-right">
-                    <button className="p-2 text-[#B89E7E] hover:text-[#D4AF37] transition-colors">
+                  <td className="px-8 py-6 text-right relative">
+                    <button 
+                      className="p-2 text-[#B89E7E] hover:text-[#D4AF37] transition-colors"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setActiveDropdown(activeDropdown === entry.id ? null : entry.id);
+                      }}
+                    >
                       <MoreVertical className="w-5 h-5" />
                     </button>
+                    
+                    {activeDropdown === entry.id && (
+                      <div className="dropdown-menu" onClick={(e) => e.stopPropagation()}>
+                        <button className="dropdown-item" onClick={() => handleEdit(entry)}>
+                          <Edit3 className="w-4 h-4" /> Modifier
+                        </button>
+                        <button className="dropdown-item danger" onClick={() => handleDelete(entry.id)}>
+                          <Trash2 className="w-4 h-4" /> Supprimer
+                        </button>
+                      </div>
+                    )}
                   </td>
                 </tr>
               ))}
               {filteredEntries.length === 0 && !loading && (
                  <tr>
                     <td colSpan={10} className="px-8 py-20 text-center text-[#B89E7E] italic text-sm">
-                       Aucun résultat trouvé pour &quot;{searchTerm}&quot;.
+                       {searchTerm ? `Aucun résultat trouvé pour "${searchTerm}".` : "Aucune saisie enregistrée. Cliquez sur 'Nouvelle Saisie Réelle' pour commencer."}
                     </td>
                  </tr>
               )}
@@ -213,7 +277,7 @@ export default function EntriesPage() {
         </div>
       </div>
 
-      <EntryModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
+      <EntryModal isOpen={isModalOpen} onClose={handleCloseModal} editEntry={editEntry} />
     </div>
   );
 }

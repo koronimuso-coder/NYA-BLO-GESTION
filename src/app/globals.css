@@ -109,3 +109,112 @@ body {
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   background: #A66037;
 }
+
+/* Toggle Switch */
+.toggle-switch {
+  position: relative;
+  width: 56px;
+  height: 32px;
+  border-radius: 9999px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+.toggle-switch.active {
+  background-color: #D4AF37;
+}
+
+.toggle-switch.inactive {
+  background-color: #E8DCC4;
+}
+
+.toggle-knob {
+  position: absolute;
+  top: 4px;
+  width: 24px;
+  height: 24px;
+  border-radius: 9999px;
+  background: white;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+  transition: left 0.3s ease;
+}
+
+.toggle-switch.active .toggle-knob {
+  left: 28px;
+}
+
+.toggle-switch.inactive .toggle-knob {
+  left: 4px;
+}
+
+/* Glassmorphism */
+.glass {
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+/* Pulse glow animation */
+@keyframes glow-pulse {
+  0%, 100% { box-shadow: 0 0 20px rgba(212, 175, 55, 0.2); }
+  50% { box-shadow: 0 0 40px rgba(212, 175, 55, 0.4); }
+}
+
+.glow-gold {
+  animation: glow-pulse 3s ease-in-out infinite;
+}
+
+/* Shimmer loading */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.shimmer {
+  background: linear-gradient(90deg, #FAF3E0 25%, #E8DCC4 37%, #FAF3E0 63%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+}
+
+/* Dropdown menu */
+.dropdown-menu {
+  position: absolute;
+  right: 0;
+  top: 100%;
+  min-width: 200px;
+  background: white;
+  border: 1px solid #E8DCC4;
+  border-radius: 16px;
+  box-shadow: 0 20px 40px -10px rgba(92, 61, 46, 0.2);
+  z-index: 50;
+  overflow: hidden;
+}
+
+.dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #5C3D2E;
+  transition: all 0.2s;
+  cursor: pointer;
+  border: none;
+  background: none;
+  width: 100%;
+  text-align: left;
+}
+
+.dropdown-item:hover {
+  background: #FAF3E0;
+  color: #A66037;
+}
+
+.dropdown-item.danger {
+  color: #DC2626;
+}
+
+.dropdown-item.danger:hover {
+  background: #FEF2F2;
+}

@@ -1,13 +1,14 @@
 "use client";
 
 import React, { useRef, useState, useEffect } from "react";
-import { Plus, Search, Building2, Users, TrendingUp, MoreVertical, Globe, Loader2 } from "lucide-react";
+import { Plus, Search, Building2, Users, TrendingUp, MoreVertical, Globe, Loader2, Edit3, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
-import { collection, onSnapshot, query, orderBy } from "firebase/firestore";
+import { collection, onSnapshot, query, orderBy, deleteDoc, doc, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase/config";
 import CompanyModal from "@/components/dashboard/CompanyModal";
+import toast from "react-hot-toast";
 
 interface Company {
   id: string;
@@ -23,7 +24,8 @@ export default function CompaniesPage() {
   const [companies, setCompanies] = useState<Company[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
-
+  const [editCompany, setEditCompany] = useState<Company | null>(null);
+  const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
 
   useEffect(() => {
@@ -35,6 +37,15 @@ export default function CompaniesPage() {
     });
     return () => unsubscribe();
   }, []);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = () => setActiveDropdown(null);
+    if (activeDropdown) {
+      document.addEventListener("click", handleClickOutside);
+      return () => document.removeEventListener("click", handleClickOutside);
+    }
+  }, [activeDropdown]);
 
   const filteredCompanies = companies.filter(c => 
     c.name?.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -63,6 +74,29 @@ export default function CompaniesPage() {
     }
   }, { scope: container, dependencies: [loading] });
 
+  const handleEdit = (company: Company) => {
+    setEditCompany(company);
+    setIsModalOpen(true);
+    setActiveDropdown(null);
+  };
+
+  const handleDelete = async (companyId: string) => {
+    if (!confirm("Êtes-vous sûr de vouloir supprimer cette entreprise ?")) return;
+    try {
+      await deleteDoc(doc(db, "companies", companyId));
+      toast.success("Entreprise supprimée !");
+    } catch (error) {
+      console.error(error);
+      toast.error("Erreur lors de la suppression.");
+    }
+    setActiveDropdown(null);
+  };
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setEditCompany(null);
+  };
+
   if (loading) return (
     <div className="min-h-[60vh] flex flex-col items-center justify-center">
        <Loader2 className="w-12 h-12 text-[#A66037] animate-spin mb-4" />
@@ -82,7 +116,7 @@ export default function CompaniesPage() {
         <Button 
           variant="gold" 
           className="rounded-2xl shadow-gold h-14 min-w-[240px] relative z-20"
-          onClick={() => setIsModalOpen(true)}
+          onClick={() => { setEditCompany(null); setIsModalOpen(true); }}
         >
           <Plus className="w-5 h-5 mr-3" />
           Ajouter une Entreprise
@@ -95,7 +129,7 @@ export default function CompaniesPage() {
           { label: "Ventes Totales", value: stats.totalSales.toLocaleString() + " FCFA", icon: TrendingUp, color: "bg-[#A66037]" },
           { label: "Opérations", value: stats.count.toString(), icon: Users, color: "bg-[#D4AF37]" },
         ].map((stat, i) => (
-          <div key={i} className="stat-card bg-white p-6 rounded-3xl shadow-premium border border-[#E8DCC4] flex items-center gap-6">
+          <div key={i} className="stat-card bg-white p-6 rounded-3xl shadow-premium border border-[#E8DCC4] flex items-center gap-6 hover:shadow-dogon hover:-translate-y-1 transition-all duration-300">
             <div className={`w-14 h-14 rounded-2xl ${stat.color} flex items-center justify-center text-[#FAF3E0] shadow-lg`}>
               <stat.icon className="w-7 h-7" />
             </div>
@@ -115,9 +149,10 @@ export default function CompaniesPage() {
                placeholder="Filtrer par nom ou secteur..." 
                value={searchTerm}
                onChange={(e) => setSearchTerm(e.target.value)}
-               className="w-full pl-14 pr-6 py-4 rounded-2xl bg-[#FAF3E0]/30 border-none focus:ring-2 focus:ring-[#D4AF37]/20 font-medium text-[#2D1A12]" 
+               className="w-full pl-14 pr-6 py-4 rounded-2xl bg-[#FAF3E0]/30 border border-[#E8DCC4] focus:ring-2 focus:ring-[#D4AF37]/20 focus:border-[#D4AF37] font-medium text-[#2D1A12] outline-none transition-all" 
              />
           </div>
+          <p className="text-sm font-bold text-[#B89E7E]">{filteredCompanies.length} entreprise(s)</p>
         </div>
 
         <div className="overflow-x-auto">
@@ -154,17 +189,34 @@ export default function CompaniesPage() {
                   <td className="px-8 py-6">
                      <span className="px-3 py-1 bg-emerald-50 text-emerald-700 rounded-full text-[10px] font-bold uppercase tracking-widest">Opérationnel</span>
                   </td>
-                  <td className="px-8 py-6 text-right">
-                    <button className="p-3 rounded-xl hover:bg-[#E8DCC4]/30 transition-colors text-[#B89E7E]">
+                  <td className="px-8 py-6 text-right relative">
+                    <button 
+                      className="p-3 rounded-xl hover:bg-[#E8DCC4]/30 transition-colors text-[#B89E7E]"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setActiveDropdown(activeDropdown === company.id ? null : company.id);
+                      }}
+                    >
                       <MoreVertical className="w-5 h-5" />
                     </button>
+                    
+                    {activeDropdown === company.id && (
+                      <div className="dropdown-menu" onClick={(e) => e.stopPropagation()}>
+                        <button className="dropdown-item" onClick={() => handleEdit(company)}>
+                          <Edit3 className="w-4 h-4" /> Modifier
+                        </button>
+                        <button className="dropdown-item danger" onClick={() => handleDelete(company.id)}>
+                          <Trash2 className="w-4 h-4" /> Supprimer
+                        </button>
+                      </div>
+                    )}
                   </td>
                 </tr>
               ))}
               {filteredCompanies.length === 0 && (
                  <tr>
                     <td colSpan={5} className="px-8 py-20 text-center text-[#B89E7E] italic uppercase tracking-widest text-xs">
-                       {searchTerm ? `Aucun résultat pour "${searchTerm}".` : "Aucune archive filiale disponible."}
+                       {searchTerm ? `Aucun résultat pour "${searchTerm}".` : "Aucune entreprise enregistrée. Cliquez sur 'Ajouter une Entreprise'."}
                     </td>
                  </tr>
               )}
@@ -172,7 +224,7 @@ export default function CompaniesPage() {
           </table>
         </div>
       </div>
-      <CompanyModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
+      <CompanyModal isOpen={isModalOpen} onClose={handleCloseModal} editCompany={editCompany} />
     </div>
   );
 }

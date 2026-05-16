@@ -27,6 +27,17 @@ export default function SettingsPage() {
   // Form fields
   const [displayName, setDisplayName] = useState(profile?.displayName || "");
   const [email] = useState(profile?.email || "");
+  const [twoFactor, setTwoFactor] = useState(false);
+  const [notifications, setNotifications] = useState<Record<string, boolean>>({
+    notif_sales: true,
+    notif_reports: true,
+    notif_alerts: true,
+    notif_system: true
+  });
+
+  const toggleNotif = (id: string) => {
+    setNotifications(prev => ({ ...prev, [id]: !prev[id] }));
+  };
 
   useGSAP(() => {
     const tl = gsap.timeline({ defaults: { ease: "power4.out" } });
@@ -174,23 +185,23 @@ export default function SettingsPage() {
                       <p className="font-bold text-[#5C3D2E]">Authentification à deux facteurs</p>
                       <p className="text-sm text-[#B89E7E]">Protégez votre compte avec une double vérification</p>
                     </div>
-                    <div className="w-14 h-8 bg-[#E8DCC4] rounded-full relative cursor-pointer">
-                      <div className="w-6 h-6 bg-white rounded-full absolute top-1 left-1 shadow-md transition-all" />
-                    </div>
+                    <button type="button" onClick={() => setTwoFactor(!twoFactor)} className={`toggle-switch ${twoFactor ? 'active' : 'inactive'}`}>
+                      <div className="toggle-knob" />
+                    </button>
                   </div>
                   <div className="flex items-center justify-between p-6 bg-[#FAF3E0]/30 rounded-3xl">
                     <div>
                       <p className="font-bold text-[#5C3D2E]">Sessions actives</p>
                       <p className="text-sm text-[#B89E7E]">1 appareil connecté en ce moment</p>
                     </div>
-                    <span className="px-4 py-2 bg-emerald-50 text-emerald-700 rounded-full text-xs font-bold uppercase">Sécurisé</span>
+                    <span className="px-4 py-2 bg-emerald-50 text-emerald-700 rounded-full text-xs font-bold uppercase tracking-widest">Sécurisé</span>
                   </div>
                   <div className="flex items-center justify-between p-6 bg-[#FAF3E0]/30 rounded-3xl">
                     <div>
                       <p className="font-bold text-[#5C3D2E]">Changer le mot de passe</p>
                       <p className="text-sm text-[#B89E7E]">Dernière modification il y a 30 jours</p>
                     </div>
-                    <button className="px-6 py-2.5 rounded-2xl border-2 border-[#A66037] text-[#A66037] font-bold text-sm hover:bg-[#A66037] hover:text-white transition-all">Modifier</button>
+                    <button className="px-6 py-3 rounded-2xl border-2 border-[#E8DCC4] text-[#A66037] font-bold text-sm hover:bg-[#FAF3E0] transition-all">Modifier</button>
                   </div>
                </div>
             </div>
@@ -200,12 +211,21 @@ export default function SettingsPage() {
             <div className="settings-card bg-white p-10 rounded-[48px] shadow-premium border border-[#E8DCC4]">
                <h3 className="text-2xl font-bold text-[#5C3D2E] font-dogon mb-8">Notifications</h3>
                <div className="space-y-6">
-                  {["Nouvelles saisies de vente", "Rapports hebdomadaires", "Alertes de recouvrement", "Mises à jour système"].map((notif) => (
-                    <div key={notif} className="flex items-center justify-between p-6 bg-[#FAF3E0]/30 rounded-3xl">
-                      <p className="font-bold text-[#5C3D2E]">{notif}</p>
-                      <div className="w-14 h-8 bg-[#D4AF37] rounded-full relative cursor-pointer">
-                        <div className="w-6 h-6 bg-white rounded-full absolute top-1 right-1 shadow-md" />
-                      </div>
+                  {[
+                    { id: 'notif_sales', label: "Nouvelles saisies de vente" },
+                    { id: 'notif_reports', label: "Rapports hebdomadaires" },
+                    { id: 'notif_alerts', label: "Alertes de recouvrement" },
+                    { id: 'notif_system', label: "Mises à jour système" }
+                  ].map((notif) => (
+                    <div key={notif.id} className="flex items-center justify-between p-6 bg-[#FAF3E0]/30 rounded-3xl">
+                      <p className="font-bold text-[#5C3D2E]">{notif.label}</p>
+                      <button 
+                        type="button" 
+                        onClick={() => toggleNotif(notif.id)} 
+                        className={`toggle-switch ${notifications[notif.id] !== false ? 'active' : 'inactive'}`}
+                      >
+                        <div className="toggle-knob" />
+                      </button>
                     </div>
                   ))}
                </div>

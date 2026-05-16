@@ -9,7 +9,9 @@ import {
   Clock,
   ArrowRight,
   Sparkles,
-  Search
+  Download,
+  Loader2,
+  CheckCircle
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import gsap from "gsap";
@@ -17,159 +19,209 @@ import { useGSAP } from "@gsap/react";
 
 import { collection, getDocs, query, orderBy } from "firebase/firestore";
 import { db } from "@/lib/firebase/config";
-import jsPDF from "jspdf";
-import "jspdf-autotable";
-import * as XLSX from "xlsx";
 import toast from "react-hot-toast";
 
-// Extend jsPDF with autotable type
-interface jsPDFWithAutoTable extends jsPDF {
-  autoTable: (options: any) => jsPDF;
-}
-
 export default function ExportsPage() {
-  const [isGenerating, setIsGenerating] = useState(false);
+  const [isGenerating, setIsGenerating] = useState<string | null>(null);
+  const [lastExport, setLastExport] = useState<{format: string, date: string} | null>(null);
   const container = useRef<HTMLDivElement>(null);
 
   useGSAP(() => {
     const tl = gsap.timeline({ defaults: { ease: "power3.out" } });
-
     tl.from(".page-header", { y: -20, opacity: 0, duration: 0.8 });
     tl.from(".export-card", { 
-      y: 20, 
+      y: 30, 
       opacity: 0, 
-      stagger: 0.1, 
+      stagger: 0.15, 
       duration: 0.6 
     }, "-=0.4");
-    
-    tl.from(".history-item", {
-      x: 20,
-      opacity: 0,
-      stagger: 0.05,
-      duration: 0.5
-    }, "-=0.2");
+    tl.from(".config-section", { y: 20, opacity: 0, duration: 0.6 }, "-=0.2");
   }, { scope: container });
 
   const fetchEntries = async () => {
     const q = query(collection(db, "daily_entries"), orderBy("createdAt", "desc"));
     const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    return snapshot.docs.map(doc => {
+      const data = doc.data();
+      const total = Number(data.totalAmount || 0);
+      const paid = Number(data.paidAmount || 0);
+      return { 
+        id: doc.id, 
+        ...data,
+        totalAmount: total,
+        paidAmount: paid,
+        resteAVerser: total - paid
+      };
+    });
   };
 
   const handleExportPDF = async () => {
-    setIsGenerating(true);
+    setIsGenerating("PDF");
     try {
       const data = await fetchEntries();
-      const doc = new jsPDF() as jsPDFWithAutoTable;
       
-      doc.setFontSize(20);
-      doc.text("RAPPORT D'ACTIVITÉ NYA BLO", 14, 22);
+      // Dynamic import to avoid SSR issues
+      const jsPDFModule = await import("jspdf");
+      const jsPDF = jsPDFModule.default;
+      await import("jspdf-autotable");
+      
+      const doc = new jsPDF();
+      
+      // Header
+      doc.setFillColor(92, 61, 46);
+      doc.rect(0, 0, 210, 40, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(22);
+      doc.text("NYA BLO — RAPPORT D'ACTIVITÉ", 14, 20);
       doc.setFontSize(10);
-      doc.text(`Généré le: ${new Date().toLocaleString()}`, 14, 30);
+      doc.text(`Généré le: ${new Date().toLocaleString('fr-FR')}`, 14, 32);
+      doc.setTextColor(0, 0, 0);
 
-      const tableData = data.map((e: any) => [
-        new Date(e.createdAt).toLocaleDateString(),
-        e.clientName || "N/A",
-        e.companyId || "N/A",
+      const tableData = data.map((e: Record<string, unknown>) => [
+        e.date ? String(e.date) : (e.createdAt ? new Date(String(e.createdAt)).toLocaleDateString('fr-FR') : "N/A"),
+        String(e.clientName || "N/A"),
+        String(e.companyId || "N/A"),
         `${Number(e.totalAmount).toLocaleString()} FCFA`,
-        `${Number(e.paidAmount).toLocaleString()} FCFA`
+        `${Number(e.paidAmount).toLocaleString()} FCFA`,
+        `${Number(e.resteAVerser).toLocaleString()} FCFA`
       ]);
 
-      doc.autoTable({
-        startY: 40,
-        head: [['Date', 'Client', 'Filiale', 'Total', 'Versé']],
+      // Use autoTable via the plugin
+      (doc as unknown as Record<string, CallableFunction>).autoTable({
+        startY: 50,
+        head: [['Date', 'Client', 'Filiale', 'Total', 'Versé', 'Reste']],
         body: tableData,
         theme: 'striped',
-        headStyles: { fillColor: [92, 61, 46] }
+        headStyles: { fillColor: [92, 61, 46], fontSize: 9, fontStyle: 'bold' },
+        alternateRowStyles: { fillColor: [250, 243, 224] },
+        styles: { fontSize: 8, cellPadding: 4 },
+        margin: { left: 14, right: 14 }
       });
 
+      // Footer summary
+      const totalVentes = data.reduce((sum, e) => sum + Number(e.totalAmount || 0), 0);
+      const totalPaid = data.reduce((sum, e) => sum + Number(e.paidAmount || 0), 0);
+      const finalY = ((doc as unknown as Record<string, Record<string, number>>).lastAutoTable?.finalY) || 200;
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "bold");
+      doc.text(`Total Ventes: ${totalVentes.toLocaleString()} FCFA`, 14, finalY + 15);
+      doc.text(`Total Encaissé: ${totalPaid.toLocaleString()} FCFA`, 14, finalY + 22);
+      doc.text(`Reste: ${(totalVentes - totalPaid).toLocaleString()} FCFA`, 14, finalY + 29);
+
       doc.save(`NYA_BLO_Rapport_${new Date().toISOString().split('T')[0]}.pdf`);
-      toast.success("Rapport PDF généré avec succès");
+      setLastExport({ format: "PDF", date: new Date().toLocaleString('fr-FR') });
+      toast.success("✅ Rapport PDF téléchargé avec succès !");
     } catch (error) {
-      console.error(error);
-      toast.error("Erreur lors de la génération du PDF");
+      console.error("PDF Export Error:", error);
+      toast.error("Erreur lors de la génération du PDF. Vérifiez la console.");
     } finally {
-      setIsGenerating(false);
+      setIsGenerating(null);
     }
   };
 
   const handleExportExcel = async () => {
-    setIsGenerating(true);
+    setIsGenerating("XLSX");
     try {
       const data = await fetchEntries();
-      const worksheet = XLSX.utils.json_to_sheet(data.map((e: any) => ({
-        ID: e.id,
-        Date: new Date(e.createdAt).toLocaleString(),
-        Client: e.clientName,
-        Entreprise: e.companyId,
-        Total: e.totalAmount,
-        Verse: e.paidAmount,
-        Reste: Number(e.totalAmount) - Number(e.paidAmount)
+      
+      // Dynamic import
+      const XLSX = await import("xlsx");
+      
+      const worksheet = XLSX.utils.json_to_sheet(data.map((e: Record<string, unknown>) => ({
+        Date: e.date ? String(e.date) : (e.createdAt ? new Date(String(e.createdAt)).toLocaleString('fr-FR') : "N/A"),
+        Client: String(e.clientName || ""),
+        Entreprise: String(e.companyId || ""),
+        "Total (FCFA)": Number(e.totalAmount),
+        "Versé (FCFA)": Number(e.paidAmount),
+        "Reste (FCFA)": Number(e.resteAVerser),
+        "Mode Paiement": String(e.modePaiement || "Espèces"),
+        Canal: String(e.canalVente || "Direct"),
+        Statut: String(e.status || "pending")
       })));
       
       const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(workbook, worksheet, "Activités");
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Activités NYA BLO");
+      
+      // Auto-size columns
+      const colWidths = [
+        { wch: 20 }, { wch: 25 }, { wch: 20 }, 
+        { wch: 15 }, { wch: 15 }, { wch: 15 },
+        { wch: 15 }, { wch: 12 }, { wch: 10 }
+      ];
+      worksheet['!cols'] = colWidths;
+      
       XLSX.writeFile(workbook, `NYA_BLO_Archives_${new Date().toISOString().split('T')[0]}.xlsx`);
-      toast.success("Archive Excel générée avec succès");
+      setLastExport({ format: "XLSX", date: new Date().toLocaleString('fr-FR') });
+      toast.success("✅ Archive Excel téléchargée avec succès !");
     } catch (error) {
-      console.error(error);
-      toast.error("Erreur lors de la génération de l'Excel");
+      console.error("Excel Export Error:", error);
+      toast.error("Erreur lors de la génération de l'Excel.");
     } finally {
-      setIsGenerating(false);
+      setIsGenerating(null);
     }
   };
 
   const handleExport = (format: string) => {
     if (format === "PDF") handleExportPDF();
     else if (format === "XLSX") handleExportExcel();
-    else {
-        toast.error("Fonctionnalité en cours de déploiement");
-    }
+    else toast("Cette fonctionnalité sera bientôt disponible.", { icon: "🔜" });
   };
+
+  const EXPORT_OPTIONS = [
+    { title: "Rapport PDF", desc: "Document formaté prêt pour impression et présentation", icon: FileText, format: "PDF", gradient: "from-[#5C3D2E] to-[#8B5E3C]" },
+    { title: "Archive Excel", desc: "Tableur complet pour analyse et calculs avancés", icon: FileSpreadsheet, format: "XLSX", gradient: "from-[#A66037] to-[#D4AF37]" },
+    { title: "Envoi par Email", desc: "Transmission sécurisée par courrier électronique", icon: Mail, format: "EMAIL", gradient: "from-[#2D1A12] to-[#5C3D2E]" },
+    { title: "Lien de Partage", desc: "Consultation web en lecture seule pour vos partenaires", icon: Share2, format: "LINK", gradient: "from-[#B89E7E] to-[#D4AF37]" },
+  ];
 
   return (
     <div ref={container} className="space-y-8 pb-12 relative">
-      <div className="absolute inset-0 dogon-pattern opacity-5 pointer-events-none" />
-
       <div className="page-header flex flex-col md:flex-row md:items-center justify-between gap-6 relative z-10">
         <div>
-          <h1 className="text-3xl font-bold text-[#5C3D2E] font-dogon uppercase tracking-tight">Archives & Experts</h1>
+          <h1 className="text-3xl font-bold text-[#5C3D2E] font-dogon uppercase tracking-tight">Archives & Exports</h1>
           <p className="text-[#B89E7E] mt-1">Exportez la puissance de vos données commerciales.</p>
         </div>
-        <div className="flex bg-white p-1 rounded-2xl border border-[#E8DCC4] shadow-sm">
-           <button className="px-6 py-2.5 bg-[#5C3D2E] text-white rounded-xl text-xs font-bold uppercase tracking-widest shadow-lg">Rapports</button>
-           <button className="px-6 py-2.5 text-[#B89E7E] hover:text-[#5C3D2E] rounded-xl text-xs font-bold uppercase tracking-widest transition-colors">Audit</button>
-        </div>
+        {lastExport && (
+          <div className="flex items-center gap-2 bg-emerald-50 px-4 py-2.5 rounded-2xl border border-emerald-200">
+            <CheckCircle className="w-4 h-4 text-emerald-600" />
+            <span className="text-sm font-bold text-emerald-700">Dernier export: {lastExport.format} — {lastExport.date}</span>
+          </div>
+        )}
       </div>
 
+      {/* Export Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 relative z-10">
-        {[
-          { title: "Rapport PDF", desc: "Format immuable pour impression", icon: FileText, format: "PDF", color: "bg-[#5C3D2E]/10 text-[#5C3D2E]" },
-          { title: "Excel / CSV", desc: "Analyse brute et calculs", icon: FileSpreadsheet, format: "XLSX", color: "bg-[#A66037]/10 text-[#A66037]" },
-          { title: "Envoi Email", desc: "Transmission directe sécurisée", icon: Mail, format: "EMAIL", color: "bg-[#D4AF37]/10 text-[#D4AF37]" },
-          { title: "Lien Public", desc: "Consultation web dynamique", icon: Share2, format: "LINK", color: "bg-[#B89E7E]/10 text-[#B89E7E]" },
-        ].map((item, i) => (
-          <div key={i} className="export-card bg-white p-8 rounded-[40px] shadow-premium border border-[#E8DCC4] hover:border-[#D4AF37]/30 transition-all flex flex-col items-center text-center group">
-             <div className={`${item.color} p-6 rounded-3xl mb-6 group-hover:scale-110 transition-transform relative overflow-hidden`}>
-                <item.icon className="w-8 h-8 relative z-10" />
-                <div className="absolute inset-0 dogon-pattern opacity-5" />
+        {EXPORT_OPTIONS.map((item, i) => (
+          <div key={i} className="export-card bg-white rounded-[32px] shadow-premium border border-[#E8DCC4] overflow-hidden hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group">
+             {/* Gradient header */}
+             <div className={`bg-gradient-to-r ${item.gradient} p-6 flex items-center justify-center`}>
+                <div className="w-16 h-16 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+                   <item.icon className="w-8 h-8 text-white" />
+                </div>
              </div>
-             <h3 className="text-xl font-bold text-[#5C3D2E] font-dogon mb-2">{item.title}</h3>
-             <p className="text-sm text-[#B89E7E] mb-8 leading-relaxed px-2">{item.desc}</p>
-             <button 
-                className="w-full py-4 rounded-2xl border-2 border-[#FAF3E0] text-[#5C3D2E] font-bold hover:bg-[#FAF3E0] transition-all flex items-center justify-center gap-2 group-hover:border-[#D4AF37]/50"
-                onClick={() => handleExport(item.format)}
-                disabled={isGenerating}
-             >
-                {isGenerating ? "Traitement..." : "Générer"}
-                <ArrowRight className="w-4 h-4" />
-             </button>
+             {/* Content */}
+             <div className="p-6 text-center">
+                <h3 className="text-lg font-bold text-[#5C3D2E] font-dogon mb-2">{item.title}</h3>
+                <p className="text-sm text-[#B89E7E] mb-6 leading-relaxed">{item.desc}</p>
+                <button 
+                   className="w-full py-4 rounded-2xl bg-[#FAF3E0] text-[#5C3D2E] font-bold hover:bg-[#5C3D2E] hover:text-white transition-all duration-300 flex items-center justify-center gap-2 border border-[#E8DCC4] hover:border-[#5C3D2E]"
+                   onClick={() => handleExport(item.format)}
+                   disabled={isGenerating !== null}
+                >
+                   {isGenerating === item.format ? (
+                     <><Loader2 className="w-4 h-4 animate-spin" /> Traitement...</>
+                   ) : (
+                     <><Download className="w-4 h-4" /> Générer</>
+                   )}
+                </button>
+             </div>
           </div>
         ))}
       </div>
 
+      {/* Configuration + History */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 relative z-10">
-         <div className="export-card lg:col-span-2 bg-white p-10 rounded-[48px] shadow-premium border border-[#E8DCC4] relative overflow-hidden">
+         <div className="config-section lg:col-span-2 bg-white p-10 rounded-[40px] shadow-premium border border-[#E8DCC4] relative overflow-hidden">
             <div className="absolute top-0 right-0 w-64 h-64 bg-[#FAF3E0]/50 rounded-bl-full -mr-32 -mt-32" />
             
             <div className="flex items-center justify-between mb-10 relative z-10">
@@ -177,76 +229,82 @@ export default function ExportsPage() {
                   <div className="w-10 h-10 bg-[#5C3D2E] rounded-xl flex items-center justify-center">
                      <Sparkles className="w-5 h-5 text-white" />
                   </div>
-                  <h3 className="text-2xl font-bold text-[#5C3D2E] font-dogon">Configuration Maître</h3>
+                  <h3 className="text-2xl font-bold text-[#5C3D2E] font-dogon">Configuration du Rapport</h3>
                </div>
-               <span className="text-[10px] font-bold text-[#A66037] uppercase tracking-[0.3em]">Options Ancestrales</span>
             </div>
             
             <div className="space-y-8 relative z-10">
                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                   <div className="space-y-2">
-                     <label className="text-[10px] font-bold text-[#B89E7E] uppercase tracking-widest pl-1">Cycle Temporel</label>
-                     <div className="relative">
-                        <select className="w-full p-5 rounded-2xl bg-[#FAF3E0]/30 border-none focus:ring-2 focus:ring-[#D4AF37]/20 font-bold text-[#5C3D2E] appearance-none">
-                           <option>Lune Actuelle (Mois)</option>
-                           <option>Double Lune (60 jours)</option>
-                           <option>Grande Récolte (Saison)</option>
-                           <option>Cycle Annuel 2024</option>
-                        </select>
-                     </div>
+                     <label className="text-[10px] font-bold text-[#B89E7E] uppercase tracking-widest pl-1">Période</label>
+                     <select className="w-full p-5 rounded-2xl bg-[#FAF3E0]/30 border-2 border-transparent focus:border-[#D4AF37] outline-none font-bold text-[#5C3D2E] appearance-none cursor-pointer">
+                        <option>Mois en cours</option>
+                        <option>60 derniers jours</option>
+                        <option>Trimestre en cours</option>
+                        <option>Année {new Date().getFullYear()}</option>
+                        <option>Toutes les données</option>
+                     </select>
                   </div>
                   <div className="space-y-2">
-                     <label className="text-[10px] font-bold text-[#B89E7E] uppercase tracking-widest pl-1">Source de Données</label>
-                     <div className="relative">
-                        <select className="w-full p-5 rounded-2xl bg-[#FAF3E0]/30 border-none focus:ring-2 focus:ring-[#D4AF37]/20 font-bold text-[#5C3D2E] appearance-none">
-                           <option>Harmonie Totale (Toutes)</option>
-                           <option>GALF SARL</option>
-                           <option>NB FLOWERS</option>
-                        </select>
-                     </div>
+                     <label className="text-[10px] font-bold text-[#B89E7E] uppercase tracking-widest pl-1">Entreprise</label>
+                     <select className="w-full p-5 rounded-2xl bg-[#FAF3E0]/30 border-2 border-transparent focus:border-[#D4AF37] outline-none font-bold text-[#5C3D2E] appearance-none cursor-pointer">
+                        <option>Toutes les entreprises</option>
+                        <option>GALF SARL</option>
+                        <option>NB FLOWERS</option>
+                     </select>
                   </div>
                </div>
                
                <div className="space-y-4">
-                  <label className="text-[10px] font-bold text-[#B89E7E] uppercase tracking-widest pl-1">Essences à extraire</label>
-                  <div className="flex flex-wrap gap-4">
-                     {["C.A", "Recouvrements", "Prospects", "Loyauté"].map(tag => (
-                        <label key={tag} className="flex items-center gap-2 bg-[#FAF3E0]/50 px-6 py-4 rounded-2xl border-2 border-transparent hover:border-[#D4AF37]/30 cursor-pointer transition-all has-[:checked]:bg-[#5C3D2E] has-[:checked]:text-white shadow-sm">
-                           <input type="checkbox" className="hidden" defaultChecked={["C.A", "Recouvrements"].includes(tag)} />
+                  <label className="text-[10px] font-bold text-[#B89E7E] uppercase tracking-widest pl-1">Données à inclure</label>
+                  <div className="flex flex-wrap gap-3">
+                     {["Chiffre d'affaires", "Recouvrements", "Clients", "Modes de paiement"].map(tag => (
+                        <label key={tag} className="flex items-center gap-2 bg-[#FAF3E0]/50 px-5 py-3 rounded-2xl border-2 border-transparent hover:border-[#D4AF37]/30 cursor-pointer transition-all has-[:checked]:bg-[#5C3D2E] has-[:checked]:text-white has-[:checked]:border-[#5C3D2E] shadow-sm">
+                           <input type="checkbox" className="hidden" defaultChecked={["Chiffre d'affaires", "Recouvrements"].includes(tag)} />
                            <span className="text-sm font-bold">{tag}</span>
                         </label>
                      ))}
                   </div>
                </div>
 
-               <Button variant="gold" className="w-full h-16 rounded-[24px] text-lg shadow-gold relative overflow-hidden">
-                  <span className="relative z-10 flex items-center justify-center gap-3">
-                     Édifier le Rapport <FileText className="w-5 h-5" />
-                  </span>
+               <Button 
+                 variant="gold" 
+                 className="w-full h-16 rounded-[24px] text-lg shadow-gold"
+                 onClick={handleExportPDF}
+                 disabled={isGenerating !== null}
+               >
+                  {isGenerating ? (
+                    <span className="flex items-center gap-3"><Loader2 className="w-5 h-5 animate-spin" /> Génération en cours...</span>
+                  ) : (
+                    <span className="flex items-center gap-3"><FileText className="w-5 h-5" /> Générer le Rapport Complet (PDF)</span>
+                  )}
                </Button>
             </div>
          </div>
 
-         <div className="export-card bg-white p-10 rounded-[48px] shadow-premium border border-[#E8DCC4]">
+         <div className="config-section bg-white p-8 rounded-[40px] shadow-premium border border-[#E8DCC4]">
             <div className="flex items-center gap-3 mb-8">
                <Clock className="w-6 h-6 text-[#A66037]" />
-               <h3 className="text-2xl font-bold text-[#5C3D2E] font-dogon">Généalogie</h3>
+               <h3 className="text-xl font-bold text-[#5C3D2E] font-dogon">Historique</h3>
             </div>
-            <div className="space-y-8">
-               {[1,2,3,4].map(i => (
-                  <div key={i} className="history-item flex gap-4">
-                     <div className="w-12 h-12 rounded-2xl bg-[#FAF3E0] flex items-center justify-center shrink-0 border border-[#E8DCC4]">
-                        <Search className="w-5 h-5 text-[#5C3D2E]" />
-                     </div>
-                     <div>
-                        <p className="text-sm font-bold text-[#5C3D2E] mb-1">Rapport de Lune {i}</p>
-                        <p className="text-[10px] text-[#B89E7E] font-bold uppercase tracking-tight">Il y a {i} jour(s)</p>
-                        <div className="flex items-center gap-4 mt-4">
-                           <button className="text-[10px] font-bold text-[#A66037] uppercase tracking-widest hover:translate-x-1 transition-transform inline-flex items-center gap-1">Prendre <ArrowRight className="w-3 h-3" /></button>
-                        </div>
-                     </div>
-                  </div>
-               ))}
+            <div className="space-y-6">
+               {lastExport ? (
+                 <div className="flex gap-4 p-4 bg-emerald-50 rounded-2xl border border-emerald-100">
+                    <div className="w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center shrink-0">
+                       <CheckCircle className="w-5 h-5 text-emerald-600" />
+                    </div>
+                    <div>
+                       <p className="text-sm font-bold text-emerald-800">Export {lastExport.format} réussi</p>
+                       <p className="text-xs text-emerald-600 mt-1">{lastExport.date}</p>
+                    </div>
+                 </div>
+               ) : (
+                 <div className="py-16 text-center">
+                    <Download className="w-12 h-12 text-[#E8DCC4] mx-auto mb-4" />
+                    <p className="text-[#B89E7E] font-medium">Aucun export réalisé pour le moment.</p>
+                    <p className="text-xs text-[#E8DCC4] mt-2">Vos rapports générés apparaîtront ici.</p>
+                 </div>
+               )}
             </div>
          </div>
       </div>
