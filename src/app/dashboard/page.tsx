@@ -62,11 +62,12 @@ export default function DashboardPage() {
      conversion: "0%",
      count: 0
   });
-  const [dateString, setDateString] = useState("");
-
+  const [mounted, setMounted] = useState(false);
   useEffect(() => {
-    setDateString(new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }));
+    const timer = setTimeout(() => setMounted(true), 0);
+    return () => clearTimeout(timer);
   }, []);
+  const dateString = mounted ? new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) : "";
 
   useEffect(() => {
     const qAll = query(collection(db, "daily_entries"), orderBy("createdAt", "desc"));
